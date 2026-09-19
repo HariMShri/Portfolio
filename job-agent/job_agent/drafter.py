@@ -2,10 +2,17 @@
 each shortlisted job, using only facts present in profile.json. This is a
 draft for YOU to review and edit before submitting anywhere -- it is not
 wired up to actually submit applications.
+
+Uses the Gemini API (generativelanguage.googleapis.com) via plain REST calls
+-- no SDK dependency needed beyond `requests`, which the rest of the agent
+already uses. Free tier is enough for the handful of drafts this needs per
+run. Get a key at aistudio.google.com/apikey (GEMINI_API_KEY).
 """
 import json
 import os
 from .models import Job
+
+API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
 SYSTEM_PROMPT = """You are helping a real job candidate draft application materials. \
 You MUST only use facts given to you in the candidate profile -- never invent \
@@ -36,7 +43,9 @@ Respond as JSON with this exact shape:
 Respond with ONLY the JSON, no other text."""
 
 
-def draft_for_job(job: Job, profile: dict, client, model: str) -> Job:
+def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
+    import requests
+
     prompt = USER_PROMPT_TEMPLATE.format(
         profile_json=json.dumps(profile, indent=2),
         title=job.title,
@@ -45,13 +54,19 @@ def draft_for_job(job: Job, profile: dict, client, model: str) -> Job:
         description=job.description[:4000] or "(no description available -- draft from title/company alone and flag that in the cover note)",
     )
     try:
-        resp = client.messages.create(
-            model=model,
-            max_tokens=1200,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
+        resp = requests.post(
+            API_URL,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "system_instruction": SYSTEM_PROMPT,
+                "input": prompt,
+            },
+            timeout=60,
         )
-        text = resp.content[0].text.strip()
+        resp.raise_for_status()
+        data = resp.json()
+        text = data.get("output_text", "").strip()
         if text.startswith("```"):
             text = text.strip("`")
             if text.startswith("json"):
@@ -66,19 +81,12 @@ def draft_for_job(job: Job, profile: dict, client, model: str) -> Job:
 
 
 def draft_shortlist(jobs: list[Job], profile: dict, model: str) -> list[Job]:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("  [drafter] ANTHROPIC_API_KEY not set -- skipping drafting, jobs will be listed without draft materials.")
+        print("  [drafter] GEMINI_API_KEY not set -- skipping drafting, jobs will be listed without draft materials.")
         return jobs
 
-    try:
-        import anthropic
-    except ImportError:
-        print("  [drafter] anthropic package not installed -- run: pip install anthropic")
-        return jobs
-
-    client = anthropic.Anthropic(api_key=api_key)
     for i, job in enumerate(jobs):
         print(f"  [drafter] drafting {i + 1}/{len(jobs)}: {job.title} @ {job.company}")
-        draft_for_job(job, profile, client, model)
+        draft_for_job(job, profile, api_key, model)
     return jobs

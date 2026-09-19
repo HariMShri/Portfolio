@@ -1,8 +1,8 @@
 # Job Search Agent
 
 Searches job listings, scores them against `profile.json`, drafts tailored
-application materials for the shortlist using Claude, writes a local HTML
-report, and emails you a daily digest. **It does not submit anything
+application materials for the shortlist using the Gemini API, writes a local
+HTML report, and emails you a daily digest. **It does not submit anything
 anywhere** — you review each draft and apply manually on the original
 listing.
 
@@ -42,7 +42,7 @@ The scheduled workflow needs two repo secrets. Go to
 Actions → New repository secret** and add both (never paste API keys into a
 chat or commit them to the repo):
 
-- `ANTHROPIC_API_KEY` — from console.anthropic.com → API Keys
+- `GEMINI_API_KEY` — from aistudio.google.com/apikey (free tier; see Cost below)
 - `RESEND_API_KEY` — from resend.com (free tier is plenty for one email/day).
   Sign up, verify your account, create an API key. No domain verification
   needed — this uses Resend's shared `onboarding@resend.dev` sending address
@@ -70,9 +70,9 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Copy `.env.example` to `.env` and add your own Anthropic API key and
-`RESEND_API_KEY` (console.anthropic.com / resend.com). Never commit `.env` —
-it's already in `.gitignore`.
+Copy `.env.example` to `.env` and add your own `GEMINI_API_KEY` and
+`RESEND_API_KEY` (aistudio.google.com/apikey / resend.com). Never commit
+`.env` — it's already in `.gitignore`.
 
 Edit `profile.json` if anything about your background changes, and
 `config.json` to:
@@ -101,6 +101,14 @@ pipeline as everything else.
 
 ## Cost
 
-Each run calls the Anthropic API once per shortlisted job (not per job
-fetched — only ones that clear `min_match_score`). Check current pricing at
-anthropic.com/pricing before running against a large shortlist.
+Each run calls the Gemini API once per shortlisted job (not per job fetched —
+only ones that clear `min_match_score`), using `gemini-2.5-flash` on the free
+tier by default (see `config.json` → `gemini_model`). One run a day for a
+shortlist of a dozen or so jobs comfortably fits inside the free tier's daily
+quota; check current limits at ai.google.dev/gemini-api/docs/pricing if you
+raise `max_results_per_source` or add a lot more source boards.
+
+Originally built against the Anthropic API, then switched to Gemini to avoid
+needing a paid key. Also considered GitHub Models (would have meant zero new
+secrets at all, reusing the workflow's built-in `GITHUB_TOKEN`) but that
+service was fully retired on July 30, 2026, so it's not an option.

@@ -1,7 +1,7 @@
 """Job search agent: searches configured sources, scores matches against your
-profile, drafts application materials for the shortlist via Claude, and writes
-a local HTML report for you to review. It does not submit anything anywhere --
-you review each draft and apply manually on the original listing.
+profile, drafts application materials for the shortlist via the Gemini API,
+and writes a local HTML report for you to review. It does not submit anything
+anywhere -- you review each draft and apply manually on the original listing.
 
 Usage:
     python main.py
@@ -12,7 +12,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # python-dotenv not installed -- ANTHROPIC_API_KEY must be set some other way
+    pass  # python-dotenv not installed -- GEMINI_API_KEY must be set some other way
 
 from job_agent.models import Job
 from job_agent.matcher import score_and_filter
@@ -93,7 +93,7 @@ def main():
 
     if shortlist:
         print("\nDrafting application materials for the shortlist...")
-        draft_shortlist(shortlist, profile, config.get("anthropic_model", "claude-sonnet-5"))
+        draft_shortlist(shortlist, profile, config.get("gemini_model", "gemini-2.5-flash"))
     else:
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")

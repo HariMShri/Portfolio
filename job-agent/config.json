@@ -38,7 +38,7 @@
     "note": "Public unauthenticated search only. No login."
   },
 
-  "anthropic_model": "claude-sonnet-5",
+  "gemini_model": "gemini-2.5-flash",
 
   "notify": {
     "enabled": true,
