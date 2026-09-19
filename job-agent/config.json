@@ -1,0 +1,49 @@
+{
+  "search_keywords": [
+    "QA Engineer",
+    "Test Engineer",
+    "SDET",
+    "Automation Test Engineer",
+    "Manual Tester",
+    "Quality Assurance"
+  ],
+  "search_locations": ["Bangalore", "India", "Remote"],
+  "max_results_per_source": 25,
+  "min_match_score": 35,
+
+  "greenhouse_boards": [
+    "stripe", "airbnb", "cloudflare", "elastic", "gitlab", "hashicorp",
+    "confluentinc", "grafanalabs", "postman", "figma", "affirm", "coinbase"
+  ],
+  "lever_boards": [
+    "netskope", "razorpay", "postman", "sprinklr", "freshworks"
+  ],
+
+  "indeed": {
+    "enabled": true,
+    "query": "QA Engineer OR Test Engineer OR SDET",
+    "location": "Bangalore, Karnataka",
+    "country_domain": "in.indeed.com"
+  },
+  "linkedin": {
+    "enabled": true,
+    "query": "QA Engineer OR Test Engineer OR SDET",
+    "location": "Bangalore, India",
+    "note": "Public unauthenticated search only. No login. Expect this to break or return partial results if LinkedIn changes markup or rate-limits the IP -- that is by design, not a bug to force past."
+  },
+  "naukri": {
+    "enabled": true,
+    "query": "qa-engineer-test-engineer-sdet",
+    "location": "bangalore",
+    "note": "Public unauthenticated search only. No login."
+  },
+
+  "anthropic_model": "claude-sonnet-5",
+
+  "notify": {
+    "enabled": true,
+    "to_email": "m.shrihari04@gmail.com",
+    "from_email": "Job Search Agent <onboarding@resend.dev>",
+    "always_send": true
+  }
+}

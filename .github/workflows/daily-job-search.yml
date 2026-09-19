@@ -1,0 +1,39 @@
+name: Daily Job Search Digest
+
+on:
+  schedule:
+    # 03:00 UTC = 08:30 IST, once every 24 hours.
+    # GitHub does not guarantee exact timing on schedule triggers, especially
+    # under platform load -- treat this as "once a day", not "at exactly 08:30".
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+    # Lets you trigger a run manually from the Actions tab to test without
+    # waiting for the schedule.
+
+permissions:
+  contents: read
+
+jobs:
+  search-and-notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: job-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run job search agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python main.py

@@ -1,0 +1,80 @@
+{
+  "name": "Shri Hari M",
+  "email": "m.shrihari04@gmail.com",
+  "phone": "+91-9789651058",
+  "location": "Bangalore, Karnataka, India",
+  "portfolio_url": "https://harimshri.github.io/Portfolio/#home",
+  "linkedin_url": "https://www.linkedin.com/in/shri-hari-80a6a01b2",
+  "github_url": "https://github.com/HariMShri",
+  "target_titles": [
+    "QA Engineer",
+    "Test Engineer",
+    "Senior Test Engineer",
+    "SDET",
+    "Automation Test Engineer",
+    "Quality Assurance Engineer",
+    "Manual Test Engineer",
+    "Software Test Engineer"
+  ],
+  "target_locations": ["Bangalore", "Chennai", "Remote", "India"],
+  "years_experience": 5,
+  "current_title": "Senior Test Engineer",
+  "current_company": "Tech Mahindra",
+  "summary": "Senior Test Engineer with 5+ years of experience in software quality assurance with strong hands-on experience in manual testing, functional testing, regression testing, integration testing, system testing, smoke testing, sanity testing, end-to-end testing, UAT support, API testing, database validation, defect management, and release validation. Experienced in analyzing business and technical requirements, preparing test scenarios and test cases, executing test cycles, identifying defects, performing retesting, and coordinating with development, product, architecture, and business stakeholders. Strong knowledge of SDLC, STLC, Agile/Scrum, defect lifecycle management, test planning, test execution, regression strategy, and release readiness.",
+  "skills": [
+    "Manual Testing", "Functional Testing", "Regression Testing", "Integration Testing",
+    "System Testing", "Smoke Testing", "Sanity Testing", "UAT", "End-to-End Testing",
+    "Test Case Design", "STLC", "SDLC", "Agile", "Scrum", "JIRA", "Confluence",
+    "SQL", "Cassandra", "Postman", "Swagger", "REST API Testing", "JSON", "XML",
+    "Apache Kafka", "NETCONF", "SNMP", "Java", "TestNG", "Maven", "Selenium",
+    "Python", "PyTest", "Playwright", "Jenkins", "Git", "GitLab", "Linux", "RHEL",
+    "Docker", "Kubernetes", "Prometheus", "Grafana", "GitHub Copilot", "Cursor"
+  ],
+  "experience": [
+    {
+      "company": "Tech Mahindra",
+      "title": "Senior Test Engineer",
+      "location": "Bangalore, India",
+      "dates": "July 2026 - Present",
+      "client": "Infinera",
+      "highlights": [
+        "Execute functional, regression, and API validation for Infinera's network management platform release cycles",
+        "Analyze technical requirements and application workflows to design test coverage for enterprise release cycles",
+        "Own defect identification and triage coordination across application, API, and system-level testing"
+      ]
+    },
+    {
+      "company": "Wipro Technologies Ltd",
+      "title": "Senior Project Engineer - Quality Assurance",
+      "location": "Chennai, India",
+      "dates": "August 2021 - July 2026",
+      "client": "Nokia Network Management System",
+      "highlights": [
+        "Executed 300+ manual and automated test cases per release across application, API, NETCONF/SNMP protocol, database, adapter, and container layers for Nokia's enterprise NMS, validating release readiness across 10 major releases",
+        "Identified and triaged 1,000+ defects across 10 releases via JIRA, driving root-cause investigation and closure coordination",
+        "Validated adapter-to-network communication using NETCONF and SNMP protocol testing",
+        "Built and executed automated regression suites in Java/TestNG/Maven",
+        "Validated backend data integrity via SQL and Cassandra queries",
+        "Validated Kafka message-flow integrity across adapters and downstream services",
+        "Monitored release health using Prometheus and Grafana dashboards across Linux/RHEL, Docker, and Kubernetes"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Technology (M.Tech) in Software Systems",
+      "institution": "Birla Institute of Technology and Science (BITS Pilani) - Work Integrated Learning Program",
+      "year": "2025"
+    }
+  ],
+  "certifications": [
+    "GitHub Copilot - Level 2",
+    "Wipro TalentNext",
+    "Internal Wipro QA and Agile Certifications",
+    "Build with Gemini - Google Cloud AI Skill Badge (Sep 2026)"
+  ],
+  "ai_tools_used": [
+    "GitHub Copilot for day-to-day automation scripting",
+    "Cursor for failure analysis and root-cause analysis on issues surfacing under load"
+  ]
+}
