@@ -784,6 +784,11 @@ contactForm.addEventListener('submit', async (e) => {
       reply: "You can find me on LinkedIn (linkedin.com/in/shri-hari-80a6a01b2) and GitHub (github.com/HariMShri) — links are also in the header and footer of this page."
     },
     {
+      id: 'assistant_built',
+      keywords: ['developed you', 'built you', 'made you', 'created you', 'build this chatbot', 'built this chatbot', 'build this assistant', 'built this assistant', 'how were you made', 'how were you built', 'who built you', 'who made you', 'how do you work', 'how does this chatbot work', 'how does this assistant work'],
+      reply: "Shri Hari built me himself, working with Claude (Anthropic's AI) inside Claude Code. I'm a resume-trained chatbot — most of my answers come from a curated knowledge base of his real experience, skills and background, matched by keyword to whatever you ask. I also have voice input and output, including a cloned version of his real voice for some replies, plus a live AI layer (Gemini, via a Cloudflare Worker) for more open-ended questions the fixed knowledge base doesn't already cover. Ask me about \"AI tools\" if you'd like to know how he uses AI in his day job too, not just on this site."
+    },
+    {
       id: 'thanks',
       keywords: ['thanks', 'thank', 'appreciate'],
       reply: "You're welcome! Let me know if there's anything else you'd like to know, or use the contact form below to reach me directly."
@@ -799,6 +804,7 @@ contactForm.addEventListener('submit', async (e) => {
   const GREETING = KB[0].reply;
 
   let opened = false;
+  let mailFlow = null;
 
   function normalize(str) {
     return ' ' + str.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
@@ -889,8 +895,124 @@ contactForm.addEventListener('submit', async (e) => {
     }
   }
 
+  // ---- "Send a mail to him" conversational flow ----
+  // Lets a recruiter/visitor ask the assistant to relay a message. Collects
+  // name -> email -> subject -> message turn by turn, then submits through
+  // the same FormSubmit endpoint the main contact form uses (FORM_ENDPOINT
+  // is declared near the top of this file, in the contact-form section).
+  const MAIL_TRIGGERS = [
+    'send a mail', 'send mail', 'send an email', 'send email',
+    'send him a mail', 'send him an email', 'send him mail', 'send him email',
+    'mail him', 'email him', 'send a message to him', 'send him a message',
+    'compose a mail', 'compose an email'
+  ];
+  const MAIL_STEPS = ['name', 'email', 'subject', 'message'];
+  const DEFAULT_PLACEHOLDER = 'Ask about skills, experience, contact...';
+
+  function isMailTrigger(text) {
+    const norm = normalize(text);
+    return MAIL_TRIGGERS.some(kw => norm.includes(' ' + kw + ' '));
+  }
+
+  function mailStepPrompt(step, data) {
+    switch (step) {
+      case 'name': return "Sure — I can pass a message along to him directly. What's your name?";
+      case 'email': return `Thanks, ${data.name}! What's your email address, so he can reply to you?`;
+      case 'subject': return "Got it. What's the subject of your message?";
+      case 'message': return "And what would you like the message to say?";
+      default: return '';
+    }
+  }
+
+  function setSuggestionsVisible(visible) {
+    if (suggestionsEl) suggestionsEl.style.display = visible ? '' : 'none';
+  }
+
+  function startMailFlow() {
+    mailFlow = { step: 0, data: {} };
+    setSuggestionsVisible(false);
+    input.placeholder = 'Type your name, or "cancel" to stop...';
+    addBotMessage(mailStepPrompt('name', {}), null);
+  }
+
+  function cancelMailFlow(message) {
+    mailFlow = null;
+    setSuggestionsVisible(true);
+    input.placeholder = DEFAULT_PLACEHOLDER;
+    addBotMessage(message, null);
+  }
+
+  async function submitMailFlow(data) {
+    showTyping();
+    try {
+      const res = await fetch(FORM_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          subject: data.subject,
+          message: data.message,
+          _subject: `New message via AI Assistant from ${data.name}`
+        })
+      });
+      hideTyping();
+      if (res.ok) {
+        addBotMessage(`Thanks, ${data.name}! I've sent that to Shri Hari — he personally replies to every message, so you should hear back soon.`, null);
+      } else {
+        throw new Error('send failed');
+      }
+    } catch (e) {
+      hideTyping();
+      addBotMessage('Sorry, something went wrong sending that. Please email him directly at m.shrihari04@gmail.com instead.', null);
+    } finally {
+      setSuggestionsVisible(true);
+      input.placeholder = DEFAULT_PLACEHOLDER;
+    }
+  }
+
+  function handleMailFlowInput(userText) {
+    const trimmed = userText.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower === 'cancel' || lower === 'stop' || lower === 'never mind' || lower === 'nevermind') {
+      cancelMailFlow("No problem, cancelled. Let me know if you'd like to try again, or ask me anything else.");
+      return;
+    }
+
+    const stepName = MAIL_STEPS[mailFlow.step];
+
+    if (stepName === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      addBotMessage('That doesn\'t look like a valid email address — mind double-checking it? (or type "cancel" to stop)', null);
+      return;
+    }
+
+    mailFlow.data[stepName] = trimmed;
+    mailFlow.step++;
+
+    if (mailFlow.step < MAIL_STEPS.length) {
+      addBotMessage(mailStepPrompt(MAIL_STEPS[mailFlow.step], mailFlow.data), null);
+    } else {
+      const data = mailFlow.data;
+      mailFlow = null;
+      setSuggestionsVisible(true);
+      input.placeholder = DEFAULT_PLACEHOLDER;
+      submitMailFlow(data);
+    }
+  }
+
   async function respond(userText) {
     addUserMessage(userText);
+
+    if (mailFlow) {
+      handleMailFlowInput(userText);
+      return;
+    }
+
+    if (isMailTrigger(userText)) {
+      startMailFlow();
+      return;
+    }
+
     showTyping();
     const minDelay = new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 400));
     const [liveReply] = await Promise.all([askLiveAI(userText), minDelay]);
@@ -924,6 +1046,11 @@ contactForm.addEventListener('submit', async (e) => {
     launcher.setAttribute('aria-expanded', 'false');
     stopVoice();
     if (recognition && listening) recognition.stop();
+    if (mailFlow) {
+      mailFlow = null;
+      setSuggestionsVisible(true);
+      input.placeholder = DEFAULT_PLACEHOLDER;
+    }
   }
 
   launcher.addEventListener('click', openPanel);
