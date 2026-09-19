@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shri Hari M | Senior Test Engineer</title>
+<meta name="description" content="Portfolio of Shri Hari M — Senior Test Engineer with 5+ years in manual testing, API testing, database validation, and QA automation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 🎮 Psst! Found a bug? Try the Konami Code: ↑ ↑ ↓ ↓ ← → ← → B A -->
+
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- ===== HEADER ===== -->
+<header class="header" id="header">
+  <div class="container header__inner">
+    <a href="#home" class="logo">Shri Hari<span>.</span></a>
+
+    <nav class="nav" id="nav">
+      <ul class="nav__list">
+        <li><a href="#home" class="nav__link active" data-link>Home</a></li>
+        <li><a href="#about" class="nav__link" data-link>About</a></li>
+        <li><a href="#skills" class="nav__link" data-link>Skills</a></li>
+        <li><a href="#ai-work" class="nav__link" data-link>AI &amp; Automation</a></li>
+        <li><a href="#experience" class="nav__link" data-link>Experience</a></li>
+        <li><a href="#education" class="nav__link" data-link>Education</a></li>
+        <li><a href="#contact" class="nav__link" data-link>Contact</a></li>
+      </ul>
+    </nav>
+
+    <div class="header__actions">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+      <a href="assets/Shri_Hari_M_Resume.pdf" download class="btn btn--sm btn--outline header__cta">
+        <i class="fa-solid fa-download"></i> Resume
+      </a>
+      <button class="nav__toggle" id="navToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero" id="home">
+    <div class="hero__bg" aria-hidden="true"></div>
+    <div class="container hero__inner">
+      <div class="hero__text" data-reveal>
+        <p class="hero__eyebrow">Hello, I'm</p>
+        <h1 class="hero__name">Shri Hari M</h1>
+        <h2 class="hero__role">
+          <span id="typedRole">Manual Test Engineer</span><span class="cursor">|</span>
+        </h2>
+        <p class="hero__desc">
+          Senior Test Engineer with <strong>5+ years</strong> of experience in software quality assurance —
+          manual testing, API validation, database checks, defect management, and release readiness across
+          enterprise-grade platforms.
+        </p>
+
+        <div class="hero__stats">
+          <div class="hero__stat">
+            <span class="hero__stat-num" data-count="5">0</span><span>+</span>
+            <p>Years Experience</p>
+          </div>
+          <div class="hero__stat">
+            <span class="hero__stat-num" data-count="2">0</span>
+            <p>Companies</p>
+          </div>
+          <div class="hero__stat">
+            <span class="hero__stat-num" data-count="20">0</span><span>+</span>
+            <p>Tools &amp; Tech</p>
+          </div>
+        </div>
+
+        <div class="hero__actions">
+          <a href="#contact" class="btn btn--primary"><i class="fa-solid fa-paper-plane"></i> Let's Talk</a>
+          <a href="assets/Shri_Hari_M_Resume.pdf" download class="btn btn--outline"><i class="fa-solid fa-download"></i> Download CV</a>
+        </div>
+
+        <div class="hero__social">
+          <a href="mailto:m.shrihari04@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+          <a href="tel:+919789651058" aria-label="Phone"><i class="fa-solid fa-phone"></i></a>
+          <a href="https://www.linkedin.com/in/shri-hari-80a6a01b2" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+          <a href="https://github.com/HariMShri/Portfolio" target="_blank" rel="noopener" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+        </div>
+      </div>
+
+      <div class="hero__visual" data-reveal>
+        <div class="portal-slider" id="portalSlider">
+
+          <button class="portal-arrow portal-arrow--prev" id="portalPrev" aria-label="Previous portal">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+
+          <div class="hero__ring">
+            <div class="portal-flash" id="portalFlash"></div>
+
+            <div class="avatar-stage">
+              <div class="portal-slide active" data-index="0">
+                <div class="hero__avatar hero__avatar--v1"><i class="fa-solid fa-user-tie"></i></div>
+              </div>
+              <div class="portal-slide" data-index="1">
+                <div class="hero__avatar hero__avatar--v2"><i class="fa-solid fa-vial-circle-check"></i></div>
+              </div>
+              <div class="portal-slide" data-index="2">
+                <div class="hero__avatar hero__avatar--v3"><i class="fa-solid fa-robot"></i></div>
+              </div>
+            </div>
+
+            <span class="orbit-badge badge-1"><i class="fa-solid fa-bug"></i></span>
+            <span class="orbit-badge badge-2"><i class="fa-brands fa-java"></i></span>
+            <span class="orbit-badge badge-3"><i class="fa-brands fa-python"></i></span>
+            <span class="orbit-badge badge-4"><i class="fa-brands fa-jira"></i></span>
+            <span class="orbit-badge badge-5"><i class="fa-solid fa-database"></i></span>
+          </div>
+
+          <button class="portal-arrow portal-arrow--next" id="portalNext" aria-label="Next portal">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <div class="portal-caption">
+            <h3 id="portalTitle">QA &amp; Test Engineering</h3>
+            <p id="portalDesc">5+ years across manual, functional &amp; release testing</p>
+          </div>
+
+          <div class="portal-gates" id="portalGates">
+            <button class="portal-gate active" data-goto="0" aria-label="Show QA &amp; Test Engineering"></button>
+            <button class="portal-gate" data-goto="1" aria-label="Show API &amp; Backend Validation"></button>
+            <button class="portal-gate" data-goto="2" aria-label="Show Automation &amp; DevOps"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a href="#about" class="scroll-down" aria-label="Scroll down">
+      <span class="scroll-down__glow"></span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </a>
+  </section>
+
+  <!-- ===== ABOUT ===== -->
+  <section class="section" id="about">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>About Me</p>
+      <h2 class="section__title" data-reveal>Quality-driven testing, backed by real enterprise experience</h2>
+
+      <div class="about__grid">
+        <div class="about__text" data-reveal>
+          <p>
+            I'm a Senior Test Engineer with over 5 years of experience in software quality assurance, specializing in
+            manual testing, functional testing, regression testing, integration testing, system testing, smoke &amp;
+            sanity testing, end-to-end testing, UAT support, API testing, database validation, defect management,
+            and release validation.
+          </p>
+          <p>
+            I work closely with development, product, architecture, and business stakeholders to analyze
+            requirements, design test scenarios, execute test cycles, track defects, and ensure releases meet
+            quality standards. My experience spans application, API, messaging (Kafka), adapter, database,
+            protocol, container, OS, and network-management layers on enterprise Nokia Network Management System
+            platforms.
+          </p>
+
+          <ul class="about__list">
+            <li><i class="fa-solid fa-check"></i> Strong grasp of SDLC, STLC, Agile/Scrum &amp; defect lifecycle management</li>
+            <li><i class="fa-solid fa-check"></i> Hands-on with JIRA, Confluence, SQL, Postman, Swagger, REST APIs</li>
+            <li><i class="fa-solid fa-check"></i> Backend validation with SQL, Cassandra, Kafka message flows</li>
+            <li><i class="fa-solid fa-check"></i> Automation exposure — Java, TestNG, Selenium, Python, PyTest, Playwright</li>
+          </ul>
+
+          <div class="about__info">
+            <div><span>Name</span><p>Shri Hari M</p></div>
+            <div><span>Location</span><p>Bangalore, Karnataka, India</p></div>
+            <div><span>Email</span><p>m.shrihari04@gmail.com</p></div>
+            <div><span>Phone</span><p>+91 97896 51058</p></div>
+          </div>
+
+          <a href="assets/Shri_Hari_M_Resume.pdf" download class="btn btn--primary">
+            <i class="fa-solid fa-download"></i> Download Full Resume
+          </a>
+        </div>
+
+        <div class="about__card" data-reveal>
+          <div class="card-glow"></div>
+          <h3>Core Focus</h3>
+          <div class="focus-item">
+            <i class="fa-solid fa-vial"></i>
+            <div><h4>Manual &amp; Functional Testing</h4><p>Functional, Regression, Integration, Smoke, Sanity, UAT, E2E</p></div>
+          </div>
+          <div class="focus-item">
+            <i class="fa-solid fa-plug"></i>
+            <div><h4>API &amp; Backend Validation</h4><p>Postman, Swagger, REST, JSON/XML, SQL, Cassandra</p></div>
+          </div>
+          <div class="focus-item">
+            <i class="fa-solid fa-diagram-project"></i>
+            <div><h4>Integration Testing</h4><p>Kafka, Adapter Testing, Message Flow Validation</p></div>
+          </div>
+          <div class="focus-item">
+            <i class="fa-solid fa-bug-slash"></i>
+            <div><h4>Defect Management</h4><p>JIRA lifecycle, triage, RCA, closure coordination</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SKILLS ===== -->
+  <section class="section section--alt" id="skills">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>Skills</p>
+      <h2 class="section__title" data-reveal>Core QA Competencies</h2>
+
+      <div class="skills__grid">
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-clipboard-check"></i></div>
+          <h3>Manual Testing</h3>
+          <div class="chip-row">
+            <span class="chip">Functional</span><span class="chip">Regression</span><span class="chip">Integration</span>
+            <span class="chip">System</span><span class="chip">Smoke</span><span class="chip">Sanity</span>
+            <span class="chip">End-to-End</span><span class="chip">UAT</span><span class="chip">Release Validation</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-list-check"></i></div>
+          <h3>Test Management</h3>
+          <div class="chip-row">
+            <span class="chip">STLC</span><span class="chip">SDLC</span><span class="chip">Test Planning</span>
+            <span class="chip">Test Case Design</span><span class="chip">Test Coverage</span><span class="chip">Retesting</span>
+            <span class="chip">Release Readiness</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-bug"></i></div>
+          <h3>Defect Management</h3>
+          <div class="chip-row">
+            <span class="chip">JIRA</span><span class="chip">Defect Reporting</span><span class="chip">Prioritization</span>
+            <span class="chip">Tracking</span><span class="chip">Root-Cause Analysis</span><span class="chip">Closure Coordination</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+          <h3>API &amp; Backend</h3>
+          <div class="chip-row">
+            <span class="chip">Postman</span><span class="chip">Swagger</span><span class="chip">REST API</span>
+            <span class="chip">JSON</span><span class="chip">XML</span><span class="chip">HTTP</span><span class="chip">Status Codes</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-database"></i></div>
+          <h3>Database Testing</h3>
+          <div class="chip-row">
+            <span class="chip">SQL</span><span class="chip">Cassandra</span><span class="chip">Data Integrity</span>
+            <span class="chip">Data Consistency</span><span class="chip">DB Validation</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-diagram-project"></i></div>
+          <h3>Integration Testing</h3>
+          <div class="chip-row">
+            <span class="chip">Kafka</span><span class="chip">Adapter Testing</span><span class="chip">Request/Response</span>
+            <span class="chip">Downstream/Upstream</span><span class="chip">Message Flow</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-robot"></i></div>
+          <h3>Automation</h3>
+          <div class="chip-row">
+            <span class="chip">Java</span><span class="chip">TestNG</span><span class="chip">Maven</span><span class="chip">Selenium</span>
+            <span class="chip">Python</span><span class="chip">PyTest</span><span class="chip">Playwright</span>
+          </div>
+        </div>
+
+        <div class="skill-card" data-reveal>
+          <div class="skill-card__icon"><i class="fa-solid fa-toolbox"></i></div>
+          <h3>Tools &amp; Environment</h3>
+          <div class="chip-row">
+            <span class="chip">JIRA</span><span class="chip">Confluence</span><span class="chip">Jenkins</span><span class="chip">Git</span>
+            <span class="chip">GitLab</span><span class="chip">Linux/RHEL</span><span class="chip">Docker</span><span class="chip">Kubernetes</span>
+            <span class="chip">SonarQube</span><span class="chip">JaCoCo</span><span class="chip">Prometheus</span><span class="chip">Grafana</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== AI & AUTOMATION ===== -->
+  <section class="section" id="ai-work">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>AI &amp; Automation</p>
+      <h2 class="section__title" data-reveal>How I use AI in my day-to-day QA work</h2>
+      <p class="section__sub" data-reveal>
+        AI tools are part of my regular testing and automation workflow — not a novelty, but something I lean on
+        to debug faster and ship more reliable checks.
+      </p>
+
+      <div class="ai-work__grid">
+        <div class="ai-work__card" data-reveal>
+          <div class="ai-work__icon"><i class="fa-brands fa-github"></i></div>
+          <h3>GitHub Copilot — Automation Scripting</h3>
+          <p>
+            I use GitHub Copilot day-to-day while building and maintaining automation scripts, moving through
+            boilerplate faster so I can spend more time on test logic, edge cases and failure conditions.
+          </p>
+          <ul class="ai-work__outcomes">
+            <li><i class="fa-solid fa-check"></i> Faster automation script implementation</li>
+            <li><i class="fa-solid fa-check"></i> Quicker to check and catch errors in test runs</li>
+          </ul>
+        </div>
+
+        <div class="ai-work__card" data-reveal>
+          <div class="ai-work__icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+          <h3>Cursor — Failure &amp; Root Cause Analysis</h3>
+          <p>
+            I use Cursor to dig into failures and trace the root cause of issues that surface under load —
+            narrowing down where in the stack a problem originates instead of stepping through logs manually,
+            line by line.
+          </p>
+          <ul class="ai-work__outcomes">
+            <li><i class="fa-solid fa-check"></i> Faster root-cause analysis on load-related failures</li>
+            <li><i class="fa-solid fa-check"></i> Easier, quicker error debugging turnaround</li>
+          </ul>
+        </div>
+
+        <div class="ai-work__card" data-reveal>
+          <div class="ai-work__icon"><i class="fa-solid fa-robot"></i></div>
+          <h3>Built With AI — This Portfolio's Assistant</h3>
+          <p>
+            Beyond day-to-day tooling, I built the AI assistant chatbot on this site myself — a resume-trained
+            conversational widget with voice input and output, including a cloned-voice integration for natural
+            spoken replies.
+          </p>
+          <ul class="ai-work__outcomes">
+            <li><i class="fa-solid fa-check"></i> Hands-on with conversational AI &amp; speech APIs</li>
+            <li><i class="fa-solid fa-check"></i> Try it — click "Ask my AI Assistant" below</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== EXPERIENCE ===== -->
+  <section class="section" id="experience">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>Experience</p>
+      <h2 class="section__title" data-reveal>Where I've worked</h2>
+
+      <div class="timeline">
+
+        <div class="timeline__item" data-reveal>
+          <div class="timeline__dot"></div>
+          <div class="timeline__content">
+            <div class="timeline__head">
+              <div>
+                <h3>Senior Test Engineer</h3>
+                <p class="timeline__company">Tech Mahindra &middot; Bangalore, India</p>
+              </div>
+              <span class="timeline__date">July 2026 &mdash; Present</span>
+            </div>
+            <p class="timeline__client">Client: Infinera</p>
+            <ul>
+              <li>Execute functional, regression, and API validation for Infinera's network management platform release cycles, partnering with product and engineering teams to maintain release readiness.</li>
+              <li>Analyze technical requirements and application workflows to design functional, regression, API, and system-level test coverage for enterprise release cycles.</li>
+              <li>Own defect identification and triage coordination across application, API, and system-level testing for ongoing release cycles.</li>
+              <li>Collaborate cross-functionally with development, QA, and release teams to translate product architecture and business workflows into test coverage.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="timeline__item" data-reveal>
+          <div class="timeline__dot"></div>
+          <div class="timeline__content">
+            <div class="timeline__head">
+              <div>
+                <h3>Senior Project Engineer &ndash; Quality Assurance</h3>
+                <p class="timeline__company">Wipro Technologies Ltd &middot; Chennai, India</p>
+              </div>
+              <span class="timeline__date">Dec 2025 &mdash; July 2026</span>
+            </div>
+            <p class="timeline__client">Client: Nokia Network Management System</p>
+            <ul>
+              <li>Promoted to Senior Project Engineer after successfully completing M.Tech in Software Systems (BITS Pilani WILP), offered as part of the employment program.</li>
+              <li>Took on expanded ownership of test planning, execution, and release validation for the Nokia NMS platform, continuing the same 300+ test cases/release and defect-triage workload at senior scope.</li>
+              <li>Communicated test execution status, defect trends, and release readiness directly to project stakeholders across release cycles.</li>
+              <li>Collaborated with developers, architects, product owners, and distributed teams during requirement analysis, defect triage, and release activities.</li>
+              <li>Continued driving root-cause defect investigation and resolution across application, API, Kafka, adapter, database, container, protocol, and infrastructure layers.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="timeline__item" data-reveal>
+          <div class="timeline__dot"></div>
+          <div class="timeline__content">
+            <div class="timeline__head">
+              <div>
+                <h3>Student Trainee</h3>
+                <p class="timeline__company">Wipro Technologies Ltd &middot; Chennai, India</p>
+              </div>
+              <span class="timeline__date">Aug 2021 &mdash; Nov 2025</span>
+            </div>
+            <p class="timeline__client">Client: Nokia Network Management System</p>
+            <ul>
+              <li>Executed 300+ manual and automated test cases per release across application, API, NETCONF/SNMP protocol, database, adapter, and container layers for Nokia's enterprise NMS, validating release readiness across 10 major releases.</li>
+              <li>Identified and triaged 1,000+ defects across 10 releases via JIRA, driving root-cause investigation and closure coordination with development teams to protect release quality.</li>
+              <li>Validated adapter-to-network communication using NETCONF and SNMP protocol testing, ensuring accurate configuration and monitoring data exchange between the NMS platform and managed network devices.</li>
+              <li>Validated REST API request/response integrity (status codes, headers, JSON/XML payloads) using Postman and Swagger across release cycles, catching backend defects before production.</li>
+              <li>Built and executed automated regression suites in Java/TestNG/Maven, complementing manual test coverage and reducing repetitive manual regression effort.</li>
+              <li>Validated backend data integrity via SQL and Cassandra queries, confirming application-to-database consistency across release cycles.</li>
+              <li>Validated Kafka message-flow integrity across adapters and downstream services, closing a key gap in inter-component request/response validation.</li>
+              <li>Monitored release health using Prometheus and Grafana dashboards, troubleshooting integration issues across Linux/RHEL, Docker, and Kubernetes environments.</li>
+              <li>Participated in Agile/Scrum activities — sprint planning, daily stand-ups, defect triage, and retrospectives — while pursuing an M.Tech in Software Systems (BITS Pilani WILP) alongside full-time work.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== EDUCATION & CERTS ===== -->
+  <section class="section section--alt" id="education">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>Education &amp; Certifications</p>
+      <h2 class="section__title" data-reveal>Academic &amp; professional credentials</h2>
+
+      <div class="edu-grid">
+        <div class="edu-card" data-reveal>
+          <div class="edu-card__icon"><i class="fa-solid fa-graduation-cap"></i></div>
+          <h3>M.Tech in Software Systems</h3>
+          <p class="edu-card__sub">Birla Institute of Technology &amp; Science (BITS Pilani) &mdash; WILP</p>
+          <span class="edu-card__year">2025</span>
+        </div>
+
+        <div class="edu-card" data-reveal>
+          <div class="edu-card__icon"><i class="fa-brands fa-github"></i></div>
+          <h3>GitHub Copilot &ndash; Level 2</h3>
+          <p class="edu-card__sub">Certification</p>
+        </div>
+
+        <div class="edu-card" data-reveal>
+          <div class="edu-card__icon"><i class="fa-solid fa-certificate"></i></div>
+          <h3>Wipro TalentNext</h3>
+          <p class="edu-card__sub">Certification</p>
+        </div>
+
+        <div class="edu-card" data-reveal>
+          <div class="edu-card__icon"><i class="fa-solid fa-award"></i></div>
+          <h3>Internal QA &amp; Agile Certifications</h3>
+          <p class="edu-card__sub">Wipro Technologies</p>
+        </div>
+
+        <div class="edu-card" data-reveal>
+          <div class="edu-card__icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <h3>Build with Gemini</h3>
+          <p class="edu-card__sub">Google Cloud &middot; Artificial Intelligence &middot; Skill Badge (Intermediate)</p>
+          <span class="edu-card__year">Issued 09 Sep 2026</span>
+          <a href="https://www.credly.com/go/51ToJ2r2" target="_blank" rel="noopener" class="edu-card__link">Verify Credential <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CONTACT ===== -->
+  <section class="section" id="contact">
+    <div class="container">
+      <p class="section__eyebrow" data-reveal>Contact</p>
+      <h2 class="section__title" data-reveal>Let's work together</h2>
+      <p class="section__sub" data-reveal>Have a role in mind or want to discuss an opportunity? Send a message — I'll get back to you directly by email.</p>
+
+      <div class="contact__grid">
+        <div class="contact__info" data-reveal>
+          <div class="contact__item">
+            <div class="contact__icon"><i class="fa-solid fa-envelope"></i></div>
+            <div><span>Email</span><a href="mailto:m.shrihari04@gmail.com">m.shrihari04@gmail.com</a></div>
+          </div>
+          <div class="contact__item">
+            <div class="contact__icon"><i class="fa-solid fa-phone"></i></div>
+            <div><span>Phone</span><a href="tel:+919789651058">+91 97896 51058</a></div>
+          </div>
+          <div class="contact__item">
+            <div class="contact__icon"><i class="fa-solid fa-location-dot"></i></div>
+            <div><span>Location</span><p>Bangalore, Karnataka, India</p></div>
+          </div>
+
+          <div class="contact__resume">
+            <i class="fa-solid fa-file-pdf"></i>
+            <div>
+              <h4>My Resume</h4>
+              <p>Get the full PDF with all experience details</p>
+            </div>
+            <a href="assets/Shri_Hari_M_Resume.pdf" download class="btn btn--sm btn--primary">Download</a>
+          </div>
+        </div>
+
+        <form class="contact__form" id="contactForm" data-reveal>
+          <div class="form__row">
+            <div class="form__group">
+              <label for="name">Your Name</label>
+              <input type="text" id="name" name="name" placeholder="John Doe" required>
+            </div>
+            <div class="form__group">
+              <label for="email">Your Email</label>
+              <input type="email" id="email" name="email" placeholder="john@company.com" required>
+            </div>
+          </div>
+          <div class="form__group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" placeholder="Job Opportunity / Collaboration" required>
+          </div>
+          <div class="form__group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="5" placeholder="Tell me about the role or opportunity..." required></textarea>
+          </div>
+          <input type="hidden" name="_subject" value="New portfolio message from Shri Hari's site">
+          <input type="text" name="_honey" class="honeypot" tabindex="-1" autocomplete="off">
+
+          <button type="submit" class="btn btn--primary btn--full" id="submitBtn">
+            <span id="submitText"><i class="fa-solid fa-paper-plane"></i> Send Message</span>
+          </button>
+          <p class="form__status" id="formStatus" role="status"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container footer__inner">
+    <a href="#home" class="logo">Shri Hari<span>.</span></a>
+    <p>&copy; <span id="year"></span> Shri Hari M. All rights reserved.</p>
+    <div class="footer__social">
+      <a href="mailto:m.shrihari04@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+      <a href="tel:+919789651058" aria-label="Phone"><i class="fa-solid fa-phone"></i></a>
+      <a href="https://www.linkedin.com/in/shri-hari-80a6a01b2" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+      <a href="https://github.com/HariMShri/Portfolio" target="_blank" rel="noopener" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+    </div>
+  </div>
+</footer>
+
+<button class="back-to-top" id="backToTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
+
+<!-- ===== AI ASSISTANT WIDGET ===== -->
+<div class="ai-widget" id="aiWidget">
+  <button class="ai-launcher" id="aiLauncher" aria-haspopup="dialog" aria-expanded="false" aria-controls="aiPanel">
+    <i class="fa-solid fa-comments"></i>
+    <span class="ai-launcher__label">Ask my AI Assistant</span>
+    <span class="ai-launcher__ping" aria-hidden="true"></span>
+  </button>
+
+  <div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI assistant chat" hidden>
+    <div class="ai-panel__header">
+      <div class="ai-panel__avatar"><i class="fa-solid fa-robot"></i></div>
+      <div class="ai-panel__title">
+        <h4>Shri Hari's AI Assistant</h4>
+        <p><span class="ai-status-dot"></span> Trained on his resume</p>
+      </div>
+      <button class="ai-panel__voice-toggle" id="aiVoiceToggle" type="button" aria-pressed="true" aria-label="Mute voice replies" title="Toggle voice replies"><i class="fa-solid fa-volume-high"></i></button>
+      <button class="ai-panel__close" id="aiClose" aria-label="Close chat"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="ai-panel__messages" id="aiMessages" aria-live="polite"></div>
+
+    <div class="ai-panel__suggestions" id="aiSuggestions">
+      <button type="button" class="ai-chip" data-q="Give me an overview of your profile">🔊 Overview</button>
+      <button type="button" class="ai-chip" data-q="What are your skills?">Skills</button>
+      <button type="button" class="ai-chip" data-q="How do you use AI in your work?">AI Tools</button>
+      <button type="button" class="ai-chip" data-q="Tell me about your experience">Experience</button>
+      <button type="button" class="ai-chip" data-q="What's your education?">Education</button>
+      <button type="button" class="ai-chip" data-q="Any certifications?">Certifications</button>
+      <button type="button" class="ai-chip" data-q="Why should we hire you?">Why hire him?</button>
+      <button type="button" class="ai-chip" data-q="How can I contact you?">Contact</button>
+    </div>
+
+    <form class="ai-panel__input" id="aiForm">
+      <button type="button" class="ai-panel__mic" id="aiMic" aria-label="Ask by voice" title="Ask by voice"><i class="fa-solid fa-microphone"></i></button>
+      <input type="text" id="aiInput" placeholder="Ask about skills, experience, contact..." autocomplete="off" maxlength="200">
+      <button type="submit" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+    </form>
+    <p class="ai-panel__disclaimer">AI assistant answering from resume data — not a live conversation with Shri Hari.</p>
+  </div>
+</div>
+
+<!-- ===== HIDDEN EASTER-EGG GAME (unlocked via Konami Code) ===== -->
+<div class="game-overlay" id="gameOverlay" hidden>
+  <div class="game-modal">
+    <button class="game-close" id="gameClose" aria-label="Close game"><i class="fa-solid fa-xmark"></i></button>
+
+    <div class="game-header">
+      <h3><i class="fa-solid fa-bug"></i> Bug Squash</h3>
+      <p>You found a secret! A real QA never lets a bug slip into production — squash as many as you can.</p>
+    </div>
+
+    <div class="game-stats">
+      <div><span>Score</span><strong id="gameScore">0</strong></div>
+      <div><span>Time</span><strong id="gameTime">30</strong>s</div>
+      <div><span>Best</span><strong id="gameBest">0</strong></div>
+    </div>
+
+    <div class="game-area" id="gameArea">
+      <div class="game-panel" id="gameStart">
+        <i class="fa-solid fa-vial-circle-check"></i>
+        <p>Ready to test your reflexes, QA style?</p>
+        <button class="btn btn--primary" id="gameStartBtn">Start Testing <i class="fa-solid fa-play"></i></button>
+      </div>
+      <div class="game-panel" id="gameOverPanel" hidden>
+        <i class="fa-solid fa-trophy"></i>
+        <h4 id="gameOverTitle">Release Complete!</h4>
+        <p>You squashed <strong id="finalScore">0</strong> bug(s).</p>
+        <button class="btn btn--primary" id="gameRetryBtn">Test Again <i class="fa-solid fa-rotate-right"></i></button>
+      </div>
+    </div>
+
+    <p class="game-hint">Tip: click the bugs before they crawl away. Press <kbd>Esc</kbd> to close.</p>
+  </div>
+</div>
+
+<script src="js/script.js"></script>
+</body>
+</html>
