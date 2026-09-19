@@ -1,13 +1,4 @@
 {
-  "search_keywords": [
-    "QA Engineer",
-    "Test Engineer",
-    "SDET",
-    "Automation Test Engineer",
-    "Manual Tester",
-    "Quality Assurance"
-  ],
-  "search_locations": ["Bangalore", "India", "Remote"],
   "max_results_per_source": 25,
   "min_match_score": 35,
 
@@ -22,19 +13,19 @@
   "indeed": {
     "enabled": true,
     "query": "QA Engineer OR Test Engineer OR SDET",
-    "location": "Bangalore, Karnataka",
+    "locations": ["Bangalore, Karnataka", "Chennai, Tamil Nadu"],
     "country_domain": "in.indeed.com"
   },
   "linkedin": {
     "enabled": true,
     "query": "QA Engineer OR Test Engineer OR SDET",
-    "location": "Bangalore, India",
+    "locations": ["Bangalore, India", "Chennai, India"],
     "note": "Public unauthenticated search only. No login. Expect this to break or return partial results if LinkedIn changes markup or rate-limits the IP -- that is by design, not a bug to force past."
   },
   "naukri": {
     "enabled": true,
     "query": "qa-engineer-test-engineer-sdet",
-    "location": "bangalore",
+    "locations": ["bangalore", "chennai"],
     "note": "Public unauthenticated search only. No login."
   },
 

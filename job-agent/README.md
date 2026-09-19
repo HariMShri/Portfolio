@@ -79,7 +79,11 @@ Edit `profile.json` if anything about your background changes, and
 - add/remove companies in `greenhouse_boards` / `lever_boards` (only companies
   that actually use those ATS platforms will return results — check a
   company's careers page URL for `boards.greenhouse.io` or `jobs.lever.co`)
-- adjust `search_keywords`, `search_locations`, `min_match_score`
+- adjust `indeed.query` / `linkedin.query`, add/remove cities in
+  `indeed.locations` / `linkedin.locations` / `naukri.locations` (each city
+  is searched separately and merged — add as many as you want)
+- adjust `min_match_score`, and `profile.json` → `target_locations` (used for
+  scoring, separate from the source-level `locations` used for searching)
 - change `notify.to_email` / disable `notify.enabled` if you don't want an
   email on every local test run
 

@@ -44,34 +44,37 @@ def collect_jobs(config: dict) -> list[Job]:
 
     indeed_cfg = config.get("indeed", {})
     if indeed_cfg.get("enabled"):
-        print("Searching Indeed (via headless browser -- may take ~15s)...")
-        found = indeed.fetch(
-            query=indeed_cfg.get("query", "QA Engineer"),
-            location=indeed_cfg.get("location", ""),
-            domain=indeed_cfg.get("country_domain", "in.indeed.com"),
-            max_results=config.get("max_results_per_source", 25),
-        )
-        print(f"  [indeed] {len(found)} jobs")
-        jobs.extend(found)
+        print("Searching Indeed (via headless browser -- may take ~15s per location)...")
+        for loc in indeed_cfg.get("locations", []):
+            found = indeed.fetch(
+                query=indeed_cfg.get("query", "QA Engineer"),
+                location=loc,
+                domain=indeed_cfg.get("country_domain", "in.indeed.com"),
+                max_results=config.get("max_results_per_source", 25),
+            )
+            print(f"  [indeed:{loc}] {len(found)} jobs")
+            jobs.extend(found)
 
     linkedin_cfg = config.get("linkedin", {})
     if linkedin_cfg.get("enabled"):
         print("Searching LinkedIn (public search, unauthenticated)...")
-        found = linkedin.fetch(
-            query=linkedin_cfg.get("query", "QA Engineer"),
-            location=linkedin_cfg.get("location", ""),
-            max_results=config.get("max_results_per_source", 25),
-        )
-        print(f"  [linkedin] {len(found)} jobs")
-        jobs.extend(found)
+        for loc in linkedin_cfg.get("locations", []):
+            found = linkedin.fetch(
+                query=linkedin_cfg.get("query", "QA Engineer"),
+                location=loc,
+                max_results=config.get("max_results_per_source", 25),
+            )
+            print(f"  [linkedin:{loc}] {len(found)} jobs")
+            jobs.extend(found)
 
     naukri_cfg = config.get("naukri", {})
     if naukri_cfg.get("enabled"):
-        found = naukri.fetch(
-            query=naukri_cfg.get("query", ""),
-            location=naukri_cfg.get("location", ""),
-        )
-        jobs.extend(found)
+        for loc in naukri_cfg.get("locations", []):
+            found = naukri.fetch(
+                query=naukri_cfg.get("query", ""),
+                location=loc,
+            )
+            jobs.extend(found)
 
     manual_found = manual.fetch()
     if manual_found:
