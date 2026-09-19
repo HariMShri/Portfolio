@@ -861,15 +861,46 @@ contactForm.addEventListener('submit', async (e) => {
     if (typing) typing.remove();
   }
 
-  function respond(userText) {
+  // ---- Live AI (Cloudflare Worker -> Gemini), with local KB as fallback ----
+  // Set this to the workers.dev URL printed by `npx wrangler deploy` in ai-worker/.
+  // Left blank until deployed -- askLiveAI() no-ops (returns null) until it's set,
+  // so the widget just runs on the local KB alone in the meantime.
+  const AI_WORKER_URL = '';
+  const AI_TIMEOUT_MS = 10000;
+
+  async function askLiveAI(userText) {
+    if (!AI_WORKER_URL) return null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    try {
+      const res = await fetch(AI_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.reply || null;
+    } catch (e) {
+      return null; // network error, timeout, rate-limited, etc. -- fall back to KB
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function respond(userText) {
     addUserMessage(userText);
     showTyping();
-    const delay = 500 + Math.random() * 500;
-    setTimeout(() => {
-      hideTyping();
+    const minDelay = new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 400));
+    const [liveReply] = await Promise.all([askLiveAI(userText), minDelay]);
+    hideTyping();
+    if (liveReply) {
+      addBotMessage(liveReply, null); // no static voice clip for a live-generated reply -- falls back to browser TTS
+    } else {
       const intent = matchIntent(userText);
       addBotMessage(intent ? intent.reply : FALLBACK, intent ? intent.id : 'fallback');
-    }, delay);
+    }
   }
 
   function openPanel() {

@@ -1,0 +1,17 @@
+{
+  "name": "shrihari-portfolio-ai",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+
+  // Basic per-IP abuse protection: 8 requests per 60 seconds. This is a free,
+  // public-facing endpoint holding a real (free-tier) API key, so some limit
+  // is needed -- without it, a script could burn through the Gemini free
+  // quota and break the widget for real visitors.
+  "ratelimits": [
+    {
+      "name": "CHAT_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 8, "period": 60 }
+    }
+  ]
+}
