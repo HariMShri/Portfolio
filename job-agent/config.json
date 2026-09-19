@@ -29,7 +29,7 @@
     "note": "Public unauthenticated search only. No login."
   },
 
-  "gemini_model": "gemini-2.5-flash",
+  "gemini_model": "gemini-3.6-flash",
 
   "notify": {
     "enabled": true,

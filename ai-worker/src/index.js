@@ -15,7 +15,7 @@
 
 const ALLOWED_ORIGIN = "https://harimshri.github.io";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_MESSAGE_LENGTH = 500;
 
 const SYSTEM_PROMPT = `You are answering questions AS Shri Hari M, a Senior Test Engineer, on his \

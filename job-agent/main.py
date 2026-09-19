@@ -96,7 +96,7 @@ def main():
 
     if shortlist:
         print("\nDrafting application materials for the shortlist...")
-        draft_shortlist(shortlist, profile, config.get("gemini_model", "gemini-2.5-flash"))
+        draft_shortlist(shortlist, profile, config.get("gemini_model", "gemini-3.6-flash"))
     else:
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")

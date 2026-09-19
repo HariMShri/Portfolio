@@ -865,7 +865,7 @@ contactForm.addEventListener('submit', async (e) => {
   // Set this to the workers.dev URL printed by `npx wrangler deploy` in ai-worker/.
   // Left blank until deployed -- askLiveAI() no-ops (returns null) until it's set,
   // so the widget just runs on the local KB alone in the meantime.
-  const AI_WORKER_URL = '';
+  const AI_WORKER_URL = 'https://shrihari-portfolio-ai.shriharigamer.workers.dev';
   const AI_TIMEOUT_MS = 10000;
 
   async function askLiveAI(userText) {

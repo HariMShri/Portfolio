@@ -107,8 +107,10 @@ pipeline as everything else.
 ## Cost
 
 Each run calls the Gemini API once per shortlisted job (not per job fetched —
-only ones that clear `min_match_score`), using `gemini-2.5-flash` on the free
-tier by default (see `config.json` → `gemini_model`). One run a day for a
+only ones that clear `min_match_score`), using `gemini-3.6-flash` on the free
+tier by default (see `config.json` → `gemini_model`; `gemini-2.5-flash` was
+the original choice but Google retired it for new API keys — confirmed via
+a live 404 from the API itself, not just docs). One run a day for a
 shortlist of a dozen or so jobs comfortably fits inside the free tier's daily
 quota; check current limits at ai.google.dev/gemini-api/docs/pricing if you
 raise `max_results_per_source` or add a lot more source boards.
