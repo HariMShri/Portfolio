@@ -7,7 +7,6 @@ skips sending and logs why, same graceful-degradation pattern as the sources.
 import os
 from datetime import datetime
 from .models import Job
-from .report import render_html
 
 
 def _summary_html(jobs: list[Job], profile: dict) -> str:
@@ -32,12 +31,12 @@ def _summary_html(jobs: list[Job], profile: dict) -> str:
     <p>{len(jobs)} job(s) matched today. Top ones:</p>
     <ul>{rows}</ul>
     {more}
-    <p>Full drafted cover notes and Q&amp;A are in the attached HTML report.
+    <p>Full drafted cover notes and Q&amp;A are in the attached PDF report.
     Nothing has been submitted anywhere &mdash; review before applying.</p>
     """
 
 
-def send_digest(jobs: list[Job], profile: dict, config: dict) -> bool:
+def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> bool:
     notify_cfg = config.get("notify", {})
     if not notify_cfg.get("enabled"):
         return False
@@ -67,18 +66,24 @@ def send_digest(jobs: list[Job], profile: dict, config: dict) -> bool:
     </body></html>
     """
 
-    full_report_html = render_html(jobs, profile)
+    try:
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+    except OSError as e:
+        print(f"  [notifier] couldn't read PDF report at {pdf_path}, sending without attachment: {e}")
+        pdf_bytes = None
 
     payload = {
         "from": notify_cfg.get("from_email", "Job Search Agent <onboarding@resend.dev>"),
         "to": [notify_cfg.get("to_email")],
         "subject": subject,
         "html": body_html,
-        "attachments": [{
-            "filename": f"job_report_{date_str}.html",
-            "content": _b64(full_report_html),
-        }],
     }
+    if pdf_bytes is not None:
+        payload["attachments"] = [{
+            "filename": f"job_report_{date_str}.pdf",
+            "content": _b64_bytes(pdf_bytes),
+        }]
 
     try:
         resp = requests.post(
@@ -97,6 +102,6 @@ def send_digest(jobs: list[Job], profile: dict, config: dict) -> bool:
         return False
 
 
-def _b64(text: str) -> str:
+def _b64_bytes(data: bytes) -> str:
     import base64
-    return base64.b64encode(text.encode("utf-8")).decode("ascii")
+    return base64.b64encode(data).decode("ascii")

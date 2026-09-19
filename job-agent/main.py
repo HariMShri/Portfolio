@@ -101,11 +101,11 @@ def main():
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")
 
-    html_path, json_path = write_report(shortlist, profile)
-    print(f"\nReport written to:\n  {html_path}\n  {json_path}")
+    html_path, pdf_path, json_path = write_report(shortlist, profile)
+    print(f"\nReport written to:\n  {html_path}\n  {pdf_path}\n  {json_path}")
 
     print("\nSending daily digest...")
-    send_digest(shortlist, profile, config)
+    send_digest(shortlist, profile, config, pdf_path)
 
     print("\nDone. Review any drafted notes before applying manually on the original listing.")
 

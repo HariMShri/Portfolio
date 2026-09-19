@@ -2,9 +2,9 @@
 
 Searches job listings, scores them against `profile.json`, drafts tailored
 application materials for the shortlist using the Gemini API, writes a local
-HTML report, and emails you a daily digest. **It does not submit anything
-anywhere** — you review each draft and apply manually on the original
-listing.
+PDF + HTML report, and emails you a daily digest with the PDF attached.
+**It does not submit anything anywhere** — you review each draft and apply
+manually on the original listing.
 
 Runs automatically once every 24 hours via
 [`.github/workflows/daily-job-search.yml`](../.github/workflows/daily-job-search.yml)
@@ -91,9 +91,10 @@ Edit `profile.json` if anything about your background changes, and
 python main.py
 ```
 
-Output lands in `output/report_<timestamp>.html` (open in a browser) and the
-matching `.json` (raw data, useful if you want to script something on top of
-it later) — both gitignored, never committed.
+Output lands in `output/report_<timestamp>.pdf` (the one emailed to you),
+plus `.html` (same content, for quickly opening in a browser) and `.json`
+(raw data, useful if you want to script something on top of it later) — all
+three gitignored, never committed.
 
 ## Adding jobs manually (e.g. from Naukri)
 

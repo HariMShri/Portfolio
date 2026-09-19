@@ -1,5 +1,6 @@
 import html
 import json
+import os
 from datetime import datetime
 from .models import Job
 
@@ -80,16 +81,99 @@ def render_html(jobs: list[Job], profile: dict) -> str:
 </body></html>"""
 
 
-def write_report(jobs: list[Job], profile: dict, out_dir: str = "output") -> tuple[str, str]:
-    import os
+def render_pdf(jobs: list[Job], profile: dict, out_path: str) -> None:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+
+    MARGIN = 46.8
+    doc = SimpleDocTemplate(
+        out_path, pagesize=A4,
+        leftMargin=MARGIN, rightMargin=MARGIN, topMargin=40, bottomMargin=40,
+        title="Job Search Shortlist",
+    )
+
+    title_style = ParagraphStyle("Title", fontName="Helvetica-Bold", fontSize=16, leading=19, spaceAfter=4)
+    meta_style = ParagraphStyle("Meta", fontName="Helvetica", fontSize=9, leading=12, textColor=colors.grey, spaceAfter=10)
+    banner_style = ParagraphStyle("Banner", fontName="Helvetica-Oblique", fontSize=9, leading=13,
+                                   textColor=colors.HexColor("#7a5a00"), backColor=colors.HexColor("#fff3cd"),
+                                   borderPadding=8, spaceAfter=16)
+    job_title_style = ParagraphStyle("JobTitle", fontName="Helvetica-Bold", fontSize=12.5, leading=15, spaceAfter=2)
+    job_sub_style = ParagraphStyle("JobSub", fontName="Helvetica", fontSize=9.5, leading=13,
+                                    textColor=colors.HexColor("#444444"), spaceAfter=6)
+    score_style = ParagraphStyle("Score", fontName="Helvetica-Bold", fontSize=9, leading=12,
+                                  textColor=colors.HexColor("#1e7d32"), spaceAfter=6)
+    reason_style = ParagraphStyle("Reason", fontName="Helvetica", fontSize=8.7, leading=11.5,
+                                   textColor=colors.HexColor("#555555"), leftIndent=12, spaceAfter=2)
+    draft_label_style = ParagraphStyle("DraftLabel", fontName="Helvetica-Bold", fontSize=8.5, leading=11,
+                                        textColor=colors.HexColor("#666666"), spaceBefore=6, spaceAfter=3)
+    draft_body_style = ParagraphStyle("DraftBody", fontName="Helvetica", fontSize=9.5, leading=13,
+                                       alignment=TA_JUSTIFY, spaceAfter=4)
+    qa_q_style = ParagraphStyle("QAQ", fontName="Helvetica-Bold", fontSize=9, leading=12, spaceAfter=1)
+    qa_a_style = ParagraphStyle("QAA", fontName="Helvetica", fontSize=9, leading=12.5, spaceAfter=6)
+    link_style = ParagraphStyle("Link", fontName="Helvetica-Bold", fontSize=9, leading=12,
+                                 textColor=colors.HexColor("#1a56db"), spaceBefore=6)
+
+    def esc(s: str) -> str:
+        return html.escape(s or "")
+
+    story = []
+    story.append(Paragraph("Job Search Shortlist", title_style))
+    generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    story.append(Paragraph(f"Generated {generated} &mdash; {len(jobs)} matches for {esc(profile.get('name', ''))}", meta_style))
+    story.append(Paragraph(
+        "This is a shortlist with drafted materials for your review. Nothing here has been submitted "
+        "anywhere &mdash; read each draft, edit it to sound like you, and submit manually on the original listing.",
+        banner_style
+    ))
+
+    for i, job in enumerate(jobs):
+        if i > 0:
+            story.append(HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#dddddd"), spaceBefore=10, spaceAfter=12))
+
+        story.append(Paragraph(esc(job.title), job_title_style))
+        story.append(Paragraph(f"{esc(job.company)} &mdash; {esc(job.location)} &middot; source: {esc(job.source)}", job_sub_style))
+        story.append(Paragraph(f"{job.match_score:.0f} match", score_style))
+
+        for reason in job.match_reasons:
+            story.append(Paragraph(f"&bull; {esc(reason)}", reason_style))
+
+        if job.draft_cover_note:
+            story.append(Paragraph("DRAFTED COVER NOTE (review before using)", draft_label_style))
+            story.append(Paragraph(esc(job.draft_cover_note), draft_body_style))
+
+        if job.draft_qa:
+            story.append(Paragraph("DRAFTED Q&amp;A", draft_label_style))
+            for qa in job.draft_qa:
+                story.append(Paragraph(esc(qa.get("question", "")), qa_q_style))
+                story.append(Paragraph(esc(qa.get("answer", "")), qa_a_style))
+
+        if job.url:
+            story.append(Paragraph(f'<link href="{esc(job.url)}">Open original listing &rarr;</link>', link_style))
+
+    if not jobs:
+        story.append(Paragraph(
+            "No jobs cleared the match threshold today. The agent ran fine -- there just wasn't a "
+            "QA/test-engineering role today that scored well against your profile.",
+            draft_body_style
+        ))
+
+    doc.build(story)
+
+
+def write_report(jobs: list[Job], profile: dict, out_dir: str = "output") -> tuple[str, str, str]:
     os.makedirs(out_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     html_path = os.path.join(out_dir, f"report_{timestamp}.html")
+    pdf_path = os.path.join(out_dir, f"report_{timestamp}.pdf")
     json_path = os.path.join(out_dir, f"report_{timestamp}.json")
 
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(render_html(jobs, profile))
+    render_pdf(jobs, profile, pdf_path)
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump([j.to_dict() for j in jobs], f, indent=2)
 
-    return html_path, json_path
+    return html_path, pdf_path, json_path
