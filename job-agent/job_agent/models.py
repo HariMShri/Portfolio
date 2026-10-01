@@ -3,6 +3,11 @@ from typing import Optional
 
 
 @dataclass
+class GeminiRunState:
+    rate_limited: bool = False
+
+
+@dataclass
 class Job:
     title: str
     company: str

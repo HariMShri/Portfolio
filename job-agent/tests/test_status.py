@@ -8,10 +8,10 @@ from unittest.mock import Mock, patch
 import requests
 
 from job_agent.status import AGENT_IDS, StatusPublisher
-from job_agent.resume_tailor import tailor_resume_for_job, validate_resume_plan
-from job_agent.models import Job
+from job_agent.resume_tailor import tailor_resume_for_job, tailor_shortlist, validate_resume_plan
+from job_agent.models import GeminiRunState, Job
 from job_agent.report import render_resume_html, write_report
-from job_agent.drafter import draft_for_job
+from job_agent.drafter import draft_for_job, draft_shortlist
 
 
 class StatusPublisherTests(unittest.TestCase):
@@ -177,6 +177,44 @@ class ResumePlanValidationTests(unittest.TestCase):
         self.assertNotIn("private provider body", logged_text)
         self.assertNotIn("test-secret", logged_text)
         self.assertFalse(job.resume_review["passed"])
+
+    def test_resume_tailor_stops_after_quota_rate_limit(self):
+        response = Mock()
+        response.raise_for_status.side_effect = requests.HTTPError(
+            "quota", response=Mock(status_code=429)
+        )
+        jobs = [
+            Job("QA Engineer", f"Example {index}", "Remote", "https://example.invalid", "manual")
+            for index in range(3)
+        ]
+        run_state = GeminiRunState()
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+                patch("job_agent.resume_tailor.requests.post", return_value=response) as post, \
+                patch("builtins.print"):
+            tailor_shortlist(jobs, self.profile, "test-model", run_state)
+
+        self.assertTrue(run_state.rate_limited)
+        self.assertEqual(post.call_count, 1)
+
+    def test_application_writer_stops_after_quota_rate_limit(self):
+        response = Mock()
+        response.raise_for_status.side_effect = requests.HTTPError(
+            "quota", response=Mock(status_code=429)
+        )
+        jobs = [
+            Job("QA Engineer", f"Example {index}", "Remote", "https://example.invalid", "manual")
+            for index in range(3)
+        ]
+        run_state = GeminiRunState()
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+                patch("requests.post", return_value=response) as post, \
+                patch("builtins.print"):
+            draft_shortlist(jobs, self.profile, "test-model", run_state)
+
+        self.assertTrue(run_state.rate_limited)
+        self.assertEqual(post.call_count, 1)
 
     def test_invalid_gemini_json_has_clear_safe_diagnostic(self):
         response = Mock()

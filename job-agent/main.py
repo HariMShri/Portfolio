@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass  # python-dotenv not installed -- GEMINI_API_KEY must be set some other way
 
-from job_agent.models import Job
+from job_agent.models import GeminiRunState, Job
 from job_agent.matcher import score_and_filter
 from job_agent.drafter import draft_shortlist
 from job_agent.report import write_report
@@ -100,23 +100,40 @@ def main():
     shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35))
     print(f"Shortlist after scoring/dedup (>= {config.get('min_match_score', 35)} match): {len(shortlist)}")
 
+    material_limit = max(0, int(config.get("max_ai_jobs_per_run", 4)))
+    material_jobs = shortlist[:material_limit]
+    if len(material_jobs) < len(shortlist):
+        print(
+            f"Preparing AI materials for the top {len(material_jobs)} shortlisted jobs "
+            f"(max_ai_jobs_per_run={material_limit}); all {len(shortlist)} remain in the report."
+        )
+    gemini_state = GeminiRunState()
+
     status.publish(
         "resume-tailor", "running", discovered=len(all_jobs),
         shortlisted=len(shortlist),
     )
-    tailor_shortlist(shortlist, profile, config.get("gemini_model", "gemini-3.6-flash"))
+    tailor_shortlist(
+        material_jobs, profile, config.get("gemini_model", "gemini-3.6-flash"), gemini_state
+    )
     resumes_tailored = sum(
         job.draft_resume is not None and bool(job.resume_review and job.resume_review.get("passed"))
-        for job in shortlist
+        for job in material_jobs
     )
 
-    if shortlist:
-        print("\nDrafting application materials for the shortlist...")
+    if material_jobs and not gemini_state.rate_limited:
+        print("\nDrafting application materials for the selected shortlist...")
         status.publish(
             "application-writer", "running", discovered=len(all_jobs),
             shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
         )
-        draft_shortlist(shortlist, profile, config.get("gemini_model", "gemini-3.6-flash"))
+        draft_shortlist(
+            material_jobs, profile, config.get("gemini_model", "gemini-3.6-flash"), gemini_state
+        )
+    elif gemini_state.rate_limited:
+        print("\nGemini rate limit reached during resume tailoring; skipping remaining generation calls.")
+    elif shortlist:
+        print("\nAI material generation is capped at zero jobs for this run; writing the full shortlist report.")
     else:
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")
@@ -125,7 +142,7 @@ def main():
         "application-reviewer", "running", discovered=len(all_jobs),
         shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
     )
-    resumes_reviewed = review_resume_drafts(shortlist, profile)
+    resumes_reviewed = review_resume_drafts(material_jobs, profile)
     resumes_tailored = resumes_reviewed
     status.publish(
         "application-reviewer", "running", discovered=len(all_jobs),
@@ -137,7 +154,7 @@ def main():
     drafted_count = sum(
         bool(job.draft_cover_note)
         and not job.draft_cover_note.startswith("[Drafting failed")
-        for job in shortlist
+        for job in material_jobs
     )
     if shortlist and drafted_count == 0 and resumes_tailored == 0:
         print(

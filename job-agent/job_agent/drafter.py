@@ -10,7 +10,7 @@ run. Get a key at aistudio.google.com/apikey (GEMINI_API_KEY).
 """
 import json
 import os
-from .models import Job
+from .models import GeminiRunState, Job
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 PROFILE_EVIDENCE_FIELDS = (
@@ -53,7 +53,13 @@ Respond as JSON with this exact shape:
 Respond with ONLY the JSON, no other text."""
 
 
-def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
+def draft_for_job(
+    job: Job,
+    profile: dict,
+    api_key: str,
+    model: str,
+    run_state: GeminiRunState | None = None,
+) -> Job:
     import requests
 
     profile_evidence = {key: profile[key] for key in PROFILE_EVIDENCE_FIELDS if key in profile}
@@ -88,6 +94,8 @@ def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "unknown"
         print(f"  [drafter] Gemini request failed (HTTP {status})")
+        if status == 429 and run_state is not None:
+            run_state.rate_limited = True
         job.draft_cover_note = f"[Drafting failed: Gemini returned HTTP {status}]"
         job.draft_qa = []
     except json.JSONDecodeError:
@@ -101,13 +109,21 @@ def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
     return job
 
 
-def draft_shortlist(jobs: list[Job], profile: dict, model: str) -> list[Job]:
+def draft_shortlist(
+    jobs: list[Job],
+    profile: dict,
+    model: str,
+    run_state: GeminiRunState | None = None,
+) -> list[Job]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("  [drafter] GEMINI_API_KEY not set -- skipping drafting, jobs will be listed without draft materials.")
         return jobs
 
     for i, job in enumerate(jobs):
+        if run_state is not None and run_state.rate_limited:
+            print("  [drafter] stopping remaining Gemini requests after rate limit")
+            break
         print(f"  [drafter] drafting {i + 1}/{len(jobs)}: {job.title} @ {job.company}")
-        draft_for_job(job, profile, api_key, model)
+        draft_for_job(job, profile, api_key, model, run_state)
     return jobs

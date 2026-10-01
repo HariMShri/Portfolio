@@ -139,14 +139,14 @@ pipeline as everything else.
 ## Cost
 
 Each run calls the Gemini API up to twice per shortlisted job (resume evidence
-selection and application-material drafting; not per job fetched — only ones
-that clear `min_match_score`), using `gemini-3.6-flash` on the free
-tier by default (see `config.json` → `gemini_model`; `gemini-2.5-flash` was
-the original choice but Google retired it for new API keys — confirmed via
-a live 404 from the API itself, not just docs). One run a day for a
-shortlist of a dozen or so jobs comfortably fits inside the free tier's daily
-quota; check current limits at ai.google.dev/gemini-api/docs/pricing if you
-raise `max_results_per_source` or add a lot more source boards.
+Each run calls Gemini at most twice for each of the top four shortlisted jobs
+by default: once for resume evidence selection and once for application
+materials. The full shortlist is still reported; change
+`config.json` → `max_ai_jobs_per_run` to adjust the number receiving AI
+materials. A rate-limit response (HTTP 429) stops further Gemini requests in
+that run. Gemini uses `gemini-3.6-flash` by default (see `config.json` →
+`gemini_model`); check current limits at ai.google.dev/gemini-api/docs/pricing
+before increasing the per-run cap.
 
 Originally built against the Anthropic API, then switched to Gemini to avoid
 needing a paid key. Also considered GitHub Models (would have meant zero new
