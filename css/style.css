@@ -430,6 +430,9 @@ body.agent-world-active .ai-widget:not(.open) .ai-launcher { visibility: hidden 
 .agent-world__team { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
 .agent-figure { min-width: 0; display: block; padding: 11px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); text-align: left; transition: border-color 160ms ease, background 160ms ease; }
 .agent-figure:hover, .agent-figure.is-selected { border-color: #39796d; background: color-mix(in srgb, #3f8878 14%, var(--surface)); }
+.agent-figure[data-motion="walking-to-break"] .agent-figure__copy::after { content: 'On a short break'; display: inline-block; margin-top: 5px; color: #8a633d; font-size: 0.66rem; }
+.agent-figure[data-motion="at-break"] .agent-figure__copy::after { content: 'Taking a breather'; display: inline-block; margin-top: 5px; color: #8a633d; font-size: 0.66rem; }
+.agent-figure[data-motion="returning"] .agent-figure__copy::after { content: 'Returning to station'; display: inline-block; margin-top: 5px; color: var(--primary); font-size: 0.66rem; }
 .agent-figure:focus-visible { outline: 2px solid #bd7a40; outline-offset: 2px; }
 .agent-figure__copy { min-width: 0; display: block; }
 .agent-figure__copy strong, .agent-figure__copy > span { display: block; }

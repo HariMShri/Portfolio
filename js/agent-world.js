@@ -1,13 +1,13 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 
 const AGENTS = [
-  { id: 'role-scout', name: 'Mira Patel', role: 'Role Scout', color: 0x2d776f, skin: 0xc88967, hair: 0x30272a, tool: 0xe0ad55 },
-  { id: 'fit-analyst', name: 'Arjun Rao', role: 'Fit Analyst', color: 0x3d6b98, skin: 0xd7a37a, hair: 0x3c312c, tool: 0xe1a954 },
-  { id: 'resume-tailor', name: 'Leena Das', role: 'Resume Tailor', color: 0xa75b42, skin: 0xb87958, hair: 0x32292b, tool: 0xd6bd61 },
-  { id: 'application-writer', name: 'Kabir Shah', role: 'Application Writer', color: 0x677f42, skin: 0xe2b48c, hair: 0x49362d, tool: 0xd88e50 },
-  { id: 'application-reviewer', name: 'Nisha Menon', role: 'Application Reviewer', color: 0x906341, skin: 0xc68365, hair: 0x29282a, tool: 0xd8bf6a },
-  { id: 'application-coordinator', name: 'Dev Malhotra', role: 'Application Coordinator', color: 0x337989, skin: 0xd29b76, hair: 0x382b28, tool: 0xe0ad55 },
-  { id: 'feedback-analyst', name: 'Tara Iyer', role: 'Feedback Analyst', color: 0x796284, skin: 0xc58a6a, hair: 0x33282d, tool: 0xd6bd61 },
+  { id: 'role-scout', name: 'Mira Patel', role: 'Role Scout', color: 0x2d776f, skin: 0xc88967, hair: 0x30272a, tool: 0xe0ad55, archetype: 'pathfinder' },
+  { id: 'fit-analyst', name: 'Arjun Rao', role: 'Fit Analyst', color: 0x3d6b98, skin: 0xd7a37a, hair: 0x3c312c, tool: 0xe1a954, archetype: 'guardian' },
+  { id: 'resume-tailor', name: 'Leena Das', role: 'Resume Tailor', color: 0xa75b42, skin: 0xb87958, hair: 0x32292b, tool: 0xd6bd61, archetype: 'cape' },
+  { id: 'application-writer', name: 'Kabir Shah', role: 'Application Writer', color: 0x677f42, skin: 0xe2b48c, hair: 0x49362d, tool: 0xd88e50, archetype: 'swift' },
+  { id: 'application-reviewer', name: 'Nisha Menon', role: 'Application Reviewer', color: 0x906341, skin: 0xc68365, hair: 0x29282a, tool: 0xd8bf6a, archetype: 'sentinel' },
+  { id: 'application-coordinator', name: 'Dev Malhotra', role: 'Application Coordinator', color: 0x337989, skin: 0xd29b76, hair: 0x382b28, tool: 0xe0ad55, archetype: 'captain' },
+  { id: 'feedback-analyst', name: 'Tara Iyer', role: 'Feedback Analyst', color: 0x796284, skin: 0xc58a6a, hair: 0x33282d, tool: 0xd6bd61, archetype: 'oracle' },
 ];
 
 const canvas = document.getElementById('agentNetworkCanvas');
@@ -54,6 +54,8 @@ const world = new THREE.Group();
 scene.add(world);
 const linkRoot = new THREE.Group();
 world.add(linkRoot);
+const breakRoot = new THREE.Group();
+world.add(breakRoot);
 
 function material(color, roughness = 0.7, metalness = 0) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness, flatShading: true });
@@ -113,6 +115,8 @@ const core = mesh(
 
 const roleTools = [];
 const nodeGroups = new Map();
+const personGroups = new Map();
+const agentMotion = new Map();
 const stationLinks = [];
 const packetMeshes = [];
 const linkMaterial = new THREE.LineBasicMaterial({ color: 0x5f9a88, transparent: true, opacity: 0.52 });
@@ -130,6 +134,7 @@ function createEngineer(agent, position, angle) {
   const skin = material(agent.skin, 0.86);
   const hair = material(agent.hair, 0.92);
   const trim = material(agent.tool, 0.4, 0.2);
+  const highlight = material(agent.tool, 0.35, 0.28);
   const deskMat = material(0x687c70, 0.46, 0.17);
   const screenMat = new THREE.MeshStandardMaterial({ color: 0x23454a, emissive: agent.color, emissiveIntensity: 0.22, roughness: 0.36 });
 
@@ -156,8 +161,15 @@ function createEngineer(agent, position, angle) {
   mesh(new THREE.BoxGeometry(0.27, 0.025, 0.15), trim, node, [0.26, 0.84, 0.31]);
 
   const person = new THREE.Group();
-  person.position.set(0, 0, -0.38);
-  node.add(person);
+  person.position.set(
+    position.x - Math.sin(angle) * 0.38,
+    0,
+    position.z - Math.cos(angle) * 0.38,
+  );
+  person.rotation.y = angle;
+  person.userData.agentId = agent.id;
+  world.add(person);
+  personGroups.set(agent.id, person);
   const torso = mesh(new THREE.BoxGeometry(0.43, 0.55, 0.29), accent, person, [0, 0.93, 0]);
   torso.userData.agentId = agent.id;
   torso.rotation.x = -0.06;
@@ -175,6 +187,46 @@ function createEngineer(agent, position, angle) {
     const leg = mesh(new THREE.BoxGeometry(0.16, 0.4, 0.19), material(0x344c4c, 0.82), person, [side * 0.12, 0.25, -0.01]);
     leg.userData.agentId = agent.id;
     mesh(new THREE.BoxGeometry(0.2, 0.12, 0.31), material(0x263d41, 0.68), person, [side * 0.12, 0.065, 0.04]);
+  }
+
+  if (agent.archetype === 'guardian') {
+    torso.scale.set(1.24, 1.04, 1.18);
+    for (const side of [-1, 1]) {
+      const pauldron = mesh(new THREE.SphereGeometry(0.16, 8, 6), trim, person, [side * 0.31, 1.13, 0]);
+      pauldron.scale.set(1.15, 0.75, 1.0);
+      mesh(new THREE.BoxGeometry(0.1, 0.22, 0.035), highlight, person, [side * 0.11, 0.96, 0.16], false);
+    }
+  } else if (agent.archetype === 'pathfinder') {
+    const hood = mesh(new THREE.SphereGeometry(0.265, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.7), accent, person, [0, 1.51, -0.035]);
+    hood.scale.set(1.07, 1.1, 1.0);
+    mesh(new THREE.BoxGeometry(0.42, 0.08, 0.06), trim, person, [0, 1.58, 0.12]);
+  } else if (agent.archetype === 'cape') {
+    const capeMaterial = new THREE.MeshStandardMaterial({ color: agent.color, roughness: 0.82, side: THREE.DoubleSide, flatShading: true });
+    const cape = mesh(new THREE.CylinderGeometry(0.2, 0.43, 0.74, 5, 1, true), capeMaterial, person, [0, 0.91, -0.2]);
+    cape.rotation.x = -0.11;
+    mesh(new THREE.OctahedronGeometry(0.09, 0), trim, person, [0, 1.18, 0.16]);
+  } else if (agent.archetype === 'swift') {
+    mesh(new THREE.TorusGeometry(0.23, 0.035, 5, 18), trim, person, [0, 1.47, 0], false).rotation.x = Math.PI / 2;
+    for (const side of [-1, 1]) {
+      mesh(new THREE.BoxGeometry(0.21, 0.09, 0.27), highlight, person, [side * 0.29, 1.03, -0.02]);
+    }
+  } else if (agent.archetype === 'sentinel') {
+    const visor = mesh(new THREE.BoxGeometry(0.4, 0.095, 0.06), highlight, person, [0, 1.49, 0.18]);
+    visor.material.emissive = new THREE.Color(agent.tool);
+    visor.material.emissiveIntensity = 0.22;
+    const shield = mesh(new THREE.TorusGeometry(0.2, 0.055, 6, 8), trim, person, [0.4, 0.92, -0.12]);
+    shield.scale.set(0.8, 1.1, 0.5);
+  } else if (agent.archetype === 'captain') {
+    const crest = mesh(new THREE.ConeGeometry(0.13, 0.28, 5), trim, person, [0, 1.75, -0.005]);
+    crest.rotation.z = Math.PI;
+    mesh(new THREE.BoxGeometry(0.44, 0.1, 0.33), highlight, person, [0, 0.94, 0.15]);
+    mesh(new THREE.OctahedronGeometry(0.085, 0), accent, person, [0, 0.94, 0.34]);
+  } else if (agent.archetype === 'oracle') {
+    const mantleMaterial = new THREE.MeshStandardMaterial({ color: agent.color, roughness: 0.76, side: THREE.DoubleSide, flatShading: true });
+    const mantle = mesh(new THREE.CylinderGeometry(0.18, 0.4, 0.64, 4, 1, true), mantleMaterial, person, [0, 0.91, -0.19]);
+    mantle.rotation.z = -0.1;
+    mesh(new THREE.TorusGeometry(0.105, 0.027, 5, 12), highlight, person, [0, 1.72, 0]);
+    mesh(new THREE.OctahedronGeometry(0.075, 0), trim, person, [0, 1.72, 0]);
   }
 
   const roleProp = new THREE.Group();
@@ -232,8 +284,59 @@ function getPositions(mobile) {
   });
 }
 
+function getBreakPositions(mobile) {
+  if (mobile) {
+    return [
+      new THREE.Vector3(-2.1, 0, -3.4),
+      new THREE.Vector3(2.1, 0, -1.25),
+      new THREE.Vector3(-2.1, 0, 1.35),
+      new THREE.Vector3(2.1, 0, 3.55),
+    ];
+  }
+  return [
+    new THREE.Vector3(-1.5, 0, -5.15),
+    new THREE.Vector3(1.6, 0, 5.0),
+    new THREE.Vector3(-5.8, 0, 0.3),
+    new THREE.Vector3(5.8, 0, -0.35),
+  ];
+}
+
+function createBreakAreas(mobile) {
+  breakRoot.clear();
+  const benchMaterial = material(0x9a7650, 0.78);
+  const metalMaterial = material(0x586d64, 0.62, 0.12);
+  const cupMaterial = material(0xf1e3c6, 0.45);
+  for (const [index, point] of getBreakPositions(mobile).entries()) {
+    const bench = new THREE.Group();
+    bench.position.set(point.x, 0, point.z);
+    bench.rotation.y = index % 2 ? Math.PI / 2 : 0;
+    breakRoot.add(bench);
+    mesh(new THREE.BoxGeometry(0.9, 0.11, 0.34), benchMaterial, bench, [0, 0.5, 0]);
+    for (const side of [-1, 1]) {
+      mesh(new THREE.BoxGeometry(0.08, 0.5, 0.28), metalMaterial, bench, [side * 0.31, 0.25, 0]);
+    }
+    mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.14, 8), cupMaterial, bench, [0.55, 0.61, 0]);
+    mesh(new THREE.TorusGeometry(0.04, 0.014, 5, 10, Math.PI), cupMaterial, bench, [0.62, 0.62, 0]);
+  }
+}
+
 let mobileLayout = window.matchMedia('(max-width: 680px)').matches;
-const agents = getPositions(mobileLayout).map((layout, index) => createEngineer(AGENTS[index], layout.position, layout.angle));
+let stationLayouts = getPositions(mobileLayout);
+const agents = stationLayouts.map((layout, index) => createEngineer(AGENTS[index], layout.position, layout.angle));
+const homePositions = AGENTS.map((agent) => personGroups.get(agent.id).position.clone());
+createBreakAreas(mobileLayout);
+AGENTS.forEach((agent, index) => {
+  const home = homePositions[index].clone();
+  const homeAngle = stationLayouts[index].angle;
+  agentMotion.set(agent.id, {
+    home,
+    homeAngle,
+    target: home.clone(),
+    phase: 'home',
+    pauseRemaining: 0.5 + (index % 4) * 0.6,
+    loungeIndex: -1,
+  });
+});
 
 function createLinks() {
   for (const child of linkRoot.children) {
@@ -285,6 +388,7 @@ let selectedId = 'role-scout';
 let pointerDown = null;
 let sceneTime = 0;
 let frameHandle = 0;
+let workflowMode = 'unknown';
 
 const cards = [...document.querySelectorAll('.agent-figure[data-agent]')];
 const selectedName = document.getElementById('agentNetworkName');
@@ -340,23 +444,132 @@ window.addEventListener('agent-status-update', (event) => {
   if (!Array.isArray(states)) return;
   if (event.detail?.unavailable) {
     AGENTS.forEach((agent) => statusById.set(agent.id, 'unknown'));
+    workflowMode = event.detail?.ambient === 'break' ? 'idle' : 'unknown';
+  } else {
+    const hasRunningAgent = states.some((state) => state.status === 'running');
+    workflowMode = event.detail?.run_status === 'running' || hasRunningAgent
+      ? 'active'
+      : event.detail?.run_status === 'idle' || event.detail?.run_status === 'completed'
+        ? 'idle'
+        : 'unknown';
   }
   for (const state of states) {
     if (statusById.has(state.id)) statusById.set(state.id, state.status);
+  }
+  if (reducedMotion.matches && workflowMode === 'active') {
+    agentMotion.forEach((motion, id) => {
+      const person = personGroups.get(id);
+      if (person) person.position.copy(motion.home);
+      motion.phase = 'home';
+      motion.target.copy(motion.home);
+    });
   }
   selectedStatus.textContent = currentStatusLabel(selectedId);
   renderFrame(0);
 });
 
+function chooseBreakTarget(motion, index) {
+  const lounges = getBreakPositions(mobileLayout);
+  const loungeIndex = (index + Math.floor(Math.random() * (lounges.length - 1)) + 1) % lounges.length;
+  motion.loungeIndex = loungeIndex;
+  const lounge = lounges[loungeIndex];
+  const angle = (index * 2.4 + sceneTime) % (Math.PI * 2);
+  const radius = 0.55 + ((index + 1) % 3) * 0.18;
+  motion.target.set(
+    THREE.MathUtils.clamp(lounge.x + Math.cos(angle) * radius, mobileLayout ? -2.45 : -6.4, mobileLayout ? 2.45 : 6.4),
+    0,
+    THREE.MathUtils.clamp(lounge.z + Math.sin(angle) * radius, mobileLayout ? -4.65 : -5.55, mobileLayout ? 4.65 : 5.55),
+  );
+  motion.phase = 'walking-to-break';
+}
+
+function updateAgentMotion(delta) {
+  for (const [index, agentData] of AGENTS.entries()) {
+    const person = personGroups.get(agentData.id);
+    const motion = agentMotion.get(agentData.id);
+    const agentStatus = statusById.get(agentData.id);
+    const shouldReturn = workflowMode === 'active';
+    const walkingSpeed = shouldReturn ? 3.4 : mobileLayout ? 0.82 : 1.15;
+    if (shouldReturn) {
+      motion.target.copy(motion.home);
+      motion.phase = person.position.distanceTo(motion.home) > 0.05 ? 'returning' : 'home';
+    } else if (workflowMode === 'idle' && !reducedMotion.matches) {
+      if (motion.phase === 'home') {
+        motion.pauseRemaining -= delta;
+        if (motion.pauseRemaining <= 0) chooseBreakTarget(motion, index);
+      } else if (motion.phase === 'at-break') {
+        motion.pauseRemaining -= delta;
+        if (motion.pauseRemaining <= 0) chooseBreakTarget(motion, index);
+      }
+    } else {
+      motion.target.copy(motion.home);
+      motion.phase = person.position.distanceTo(motion.home) > 0.05 ? 'returning' : 'home';
+    }
+
+    if (reducedMotion.matches) {
+      if (workflowMode === 'active' || workflowMode === 'unknown') person.position.copy(motion.home);
+      else if (workflowMode === 'idle') {
+        const lounges = getBreakPositions(mobileLayout);
+        const lounge = lounges[index % lounges.length];
+        const side = index % 2 === 0 ? -1 : 1;
+        motion.target.set(lounge.x + side * 0.72, 0, lounge.z + (index % 3 - 1) * 0.16);
+        motion.loungeIndex = index % lounges.length;
+        person.position.copy(motion.target);
+        person.rotation.y = motion.homeAngle;
+        motion.phase = 'at-break';
+      } else {
+        person.position.copy(motion.home);
+        motion.phase = 'home';
+      }
+      const reducedMotionCard = cards.find((item) => item.dataset.agent === agentData.id);
+      if (reducedMotionCard && reducedMotionCard.dataset.motion !== motion.phase) {
+        reducedMotionCard.dataset.motion = motion.phase;
+      }
+      continue;
+    }
+
+    const offsetX = motion.target.x - person.position.x;
+    const offsetZ = motion.target.z - person.position.z;
+    const distance = Math.hypot(offsetX, offsetZ);
+    if (distance > 0.035) {
+      const step = Math.min(distance, walkingSpeed * delta);
+      person.position.x += (offsetX / distance) * step;
+      person.position.z += (offsetZ / distance) * step;
+      person.rotation.y = Math.atan2(offsetX, offsetZ);
+      if (motion.phase === 'home' || motion.phase === 'at-break') {
+        motion.phase = shouldReturn ? 'returning' : 'walking-to-break';
+      }
+    } else if (motion.phase === 'walking-to-break') {
+      motion.phase = 'at-break';
+      motion.pauseRemaining = 3.5 + ((index * 7) % 5) * 1.1;
+    } else if (motion.phase === 'returning') {
+      motion.phase = 'home';
+      person.rotation.y = motion.homeAngle;
+    }
+
+    const card = cards.find((item) => item.dataset.agent === agentData.id);
+    if (card && card.dataset.motion !== motion.phase) card.dataset.motion = motion.phase;
+
+    if (motion.phase === 'home') {
+      person.position.y = agentStatus === 'running'
+        ? 0.045 + Math.sin(sceneTime * 4 + index) * 0.05
+        : Math.sin(sceneTime * 0.65 + index) * 0.018;
+    } else if (motion.phase === 'at-break') {
+      person.position.y = 0.012 + Math.sin(sceneTime * 1.4 + index) * 0.012;
+      person.rotation.y = motion.homeAngle + Math.sin(sceneTime * 0.35 + index) * 0.035;
+    } else {
+      person.position.y = Math.abs(Math.sin(sceneTime * 7 + index)) * 0.045;
+    }
+  }
+}
+
 function renderFrame(delta) {
   sceneTime += delta;
+  canvas.dataset.workflowMode = workflowMode;
   if (!reducedMotion.matches) {
     core.rotation.y += delta * 0.7;
     gate.rotation.y += delta * 0.24;
-    for (const [index, agent] of agents.entries()) {
-      const active = statusById.get(AGENTS[index].id) === 'running';
-      agent.position.y = active ? 0.045 + Math.sin(sceneTime * 4 + index) * 0.05 : Math.sin(sceneTime * 0.65 + index) * 0.018;
-    }
+    updateAgentMotion(delta);
     for (const item of packetMeshes) {
       const active = statusById.get(item.agentId) === 'running';
       const t = active ? (sceneTime * 0.3 + item.phase) % 1 : 0.22 + item.phase * 0.08;
@@ -365,6 +578,7 @@ function renderFrame(delta) {
       item.packet.visible = active;
     }
   } else {
+    updateAgentMotion(delta);
     packetMeshes.forEach(({ packet }) => { packet.visible = false; });
   }
 
@@ -403,11 +617,25 @@ function resizeScene() {
   const isMobile = rect.width < 680;
   if (isMobile !== mobileLayout) {
     mobileLayout = isMobile;
-    const layouts = getPositions(mobileLayout);
-    agents.forEach((agent, index) => {
-      agent.position.set(layouts[index].position.x, 0, layouts[index].position.z);
-      agent.rotation.y = layouts[index].angle;
+    stationLayouts = getPositions(mobileLayout);
+    agents.forEach((station, index) => {
+      const layout = stationLayouts[index];
+      station.position.set(layout.position.x, 0, layout.position.z);
+      station.rotation.y = layout.angle;
+      const motion = agentMotion.get(AGENTS[index].id);
+      const person = personGroups.get(AGENTS[index].id);
+      motion.home.set(
+        layout.position.x - Math.sin(layout.angle) * 0.38,
+        0,
+        layout.position.z - Math.cos(layout.angle) * 0.38,
+      );
+      motion.homeAngle = layout.angle;
+      person.position.copy(motion.home);
+      person.rotation.y = layout.angle;
+      motion.target.copy(motion.home);
+      motion.phase = 'home';
     });
+    createBreakAreas(mobileLayout);
     createLinks();
   }
   const viewHeight = isMobile ? 12.7 : 10.4;

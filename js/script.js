@@ -105,7 +105,9 @@ document.getElementById('year').textContent = new Date().getFullYear();
           card.dataset.status = 'unknown';
         });
         countEls.forEach(element => { element.textContent = '--'; });
-        window.dispatchEvent(new CustomEvent('agent-status-update', { detail: { agents: [], unavailable: true } }));
+        window.dispatchEvent(new CustomEvent('agent-status-update', {
+          detail: { agents: [], unavailable: true, ambient: 'break' },
+        }));
         return;
       }
       if (!response.ok) throw new Error('Status endpoint returned an error');
@@ -139,8 +141,39 @@ document.getElementById('year').textContent = new Date().getFullYear();
       });
       const selectedCard = document.querySelector('.agent-figure[aria-pressed="true"]');
       if (selectedCard) selectAgentCard(selectedCard.dataset.agent, false);
-      window.dispatchEvent(new CustomEvent('agent-status-update', { detail: { agents: data.agents } }));
-      updatedEl.textContent = `${stale ? 'Last reported' : 'Updated'} ${new Date(updatedAt).toLocaleString()}. Aggregate counts only; applications are not submitted by this system.`;
+      window.dispatchEvent(new CustomEvent('agent-status-update', {
+        detail: { agents: data.agents, run_status: data.run_status },
+      }));
+      const noMaterials = data.run_status === 'completed'
+        && data.counts.shortlisted > 0
+        && data.counts.drafted === 0
+        && data.counts.resumes_tailored === 0;
+      if (noMaterials) {
+        liveEl.classList.remove('is-live');
+        liveEl.classList.add('is-unavailable');
+        statusEl.textContent = 'Search finished · no drafts generated';
+        updatedEl.textContent = `Found ${data.counts.shortlisted} shortlisted roles, but no cover-note drafts or tailored resumes were reported. Check the latest Daily Job Search Digest logs and confirm the GitHub Actions GEMINI_API_KEY secret. Email delivery separately requires RESEND_API_KEY. Job details remain private; this panel shows aggregate counts only.`;
+        const failedStages = new Set(['resume-tailor', 'application-writer', 'application-reviewer']);
+        agentEls.forEach(({ card, label }, id) => {
+          if (!failedStages.has(id)) return;
+          label.textContent = labels.failed;
+          label.dataset.status = 'failed';
+          card.dataset.status = 'failed';
+        });
+        const selectedAgent = document.querySelector('.agent-figure[aria-pressed="true"]');
+        if (selectedAgent) selectAgentCard(selectedAgent.dataset.agent, false);
+        window.dispatchEvent(new CustomEvent('agent-status-update', {
+          detail: {
+            agents: data.agents.map(agent => ({
+              ...agent,
+              status: failedStages.has(agent.id) ? 'failed' : agent.status,
+            })),
+            run_status: data.run_status,
+          },
+        }));
+      } else {
+        updatedEl.textContent = `${stale ? 'Last reported' : 'Updated'} ${new Date(updatedAt).toLocaleString()}. Aggregate counts only; applications are not submitted by this system.`;
+      }
     } catch (error) {
       showUnavailable('The status service is not configured or could not be reached. Applications are not submitted by this system.');
     } finally {

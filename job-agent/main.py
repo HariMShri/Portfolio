@@ -139,6 +139,11 @@ def main():
         and not job.draft_cover_note.startswith("[Drafting failed")
         for job in shortlist
     )
+    if shortlist and drafted_count == 0 and resumes_tailored == 0:
+        print(
+            "\nNo application materials were generated. Check the GEMINI_API_KEY secret "
+            "and the preceding Gemini/resume-tailor diagnostics in this run."
+        )
     status.publish(
         "application-writer", "running", discovered=len(all_jobs),
         shortlisted=len(shortlist), drafted=drafted_count,
@@ -149,7 +154,7 @@ def main():
 
     print("\nSending daily digest...")
     try:
-        send_digest(shortlist, profile, config, pdf_path)
+        digest_sent = send_digest(shortlist, profile, config, pdf_path)
     except Exception:
         status.publish(
             "application-coordinator", "failed", discovered=len(all_jobs),
@@ -158,6 +163,22 @@ def main():
             phase_complete=True,
         )
         raise
+
+    notifications_enabled = config.get("notify", {}).get("enabled", False)
+    if notifications_enabled and not digest_sent:
+        print(
+            "\nDaily digest was not delivered. Check RESEND_API_KEY and the notifier "
+            "diagnostics above; the private report was written to the run output."
+        )
+        status.publish(
+            "application-coordinator", "failed", discovered=len(all_jobs),
+            shortlisted=len(shortlist), drafted=drafted_count,
+            resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
+            phase_complete=True,
+        )
+        return
+    if not notifications_enabled:
+        print("\nDaily digest notification is disabled in config.json.")
 
     print("\nDone. Review any drafted notes before applying manually on the original listing.")
     status.publish(

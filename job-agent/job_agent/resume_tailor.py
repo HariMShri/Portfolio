@@ -113,7 +113,8 @@ previous roles when relevant; never alter the indexed source facts. Return exact
         plan, issues = validate_resume_plan(parsed, profile)
         job.draft_resume = plan
         job.resume_review = {"passed": not issues, "issues": issues}
-    except Exception:
+    except Exception as exc:
+        print(f"  [resume-tailor] generation failed ({type(exc).__name__})")
         job.draft_resume = None
         job.resume_review = {
             "passed": False,

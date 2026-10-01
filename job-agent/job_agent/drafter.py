@@ -86,6 +86,7 @@ def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
         job.draft_cover_note = parsed.get("cover_note")
         job.draft_qa = parsed.get("qa", [])
     except Exception as e:
+        print(f"  [drafter] generation failed ({type(e).__name__})")
         job.draft_cover_note = f"[Drafting failed for this job: {e}]"
         job.draft_qa = []
     return job

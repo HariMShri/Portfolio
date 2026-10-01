@@ -208,6 +208,25 @@ class ResumePlanValidationTests(unittest.TestCase):
         )
         self.assertEqual(coordinator["status"], "failed")
 
+    def test_zero_generated_materials_mark_completed_stages_needing_attention(self):
+        with patch.dict(os.environ, {
+            "STATUS_API_URL": "https://example.invalid/internal/status",
+            "STATUS_API_TOKEN": "test-token",
+        }), patch("job_agent.status.requests.post") as post:
+            StatusPublisher().publish(
+                "application-coordinator", "completed", discovered=100,
+                shortlisted=5, drafted=0, resumes_tailored=0,
+                awaiting_review=0, phase_complete=True,
+            )
+
+        agents = {agent["id"]: agent["status"] for agent in post.call_args.kwargs["json"]["agents"]}
+        self.assertEqual(agents["role-scout"], "completed")
+        self.assertEqual(agents["fit-analyst"], "completed")
+        self.assertEqual(agents["resume-tailor"], "failed")
+        self.assertEqual(agents["application-writer"], "failed")
+        self.assertEqual(agents["application-reviewer"], "failed")
+        self.assertEqual(agents["application-coordinator"], "completed")
+
 
 if __name__ == "__main__":
     unittest.main()

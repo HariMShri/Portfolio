@@ -59,6 +59,18 @@ class StatusPublisher:
                     status = "idle"
             else:
                 status = "planned"
+
+            stage_finished = agent_id in ACTIVE_PHASES and (
+                run_status in ("completed", "failed")
+                or (agent_id == phase and phase_complete)
+            )
+            if stage_finished and shortlisted > 0:
+                if agent_id == "resume-tailor" and resumes_tailored == 0:
+                    status = "failed"
+                elif agent_id == "application-writer" and drafted == 0:
+                    status = "failed"
+                elif agent_id == "application-reviewer" and resumes_tailored == 0:
+                    status = "failed"
             agents.append({"id": agent_id, "status": status})
 
         payload = {
