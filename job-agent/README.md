@@ -54,6 +54,34 @@ Once both secrets are set, the workflow runs on its own daily (03:00 UTC /
 immediately instead of waiting: **Actions tab → Daily Job Search Digest → Run
 workflow**.
 
+### Optional live portfolio status
+
+The AI & Automation section can show aggregate-only progress from the latest
+job-agent run. The worker needs a Cloudflare KV namespace bound as
+`JOB_STATUS`, plus a `JOB_STATUS_TOKEN` secret. Create a namespace with
+`npx wrangler kv namespace create JOB_STATUS`, then add the returned namespace
+ID under `kv_namespaces` in `ai-worker/wrangler.jsonc`:
+
+```jsonc
+"kv_namespaces": [
+  { "binding": "JOB_STATUS", "id": "<namespace-id>" }
+]
+```
+
+Set the Worker secret with `npx wrangler secret put JOB_STATUS_TOKEN` and use
+the same high-entropy value as the GitHub Actions secret `STATUS_API_TOKEN`.
+Set the Actions variable `STATUS_API_URL` to
+`https://<worker-host>/internal/status`. The writer endpoint accepts only the
+allowlisted aggregate contract; `GET https://<worker-host>/status` is public
+and contains no job-level or candidate information. Without this binding and
+configuration the website shows a status-unavailable state, and job search
+continues normally. Never publish report JSON or add job details to this feed.
+
+The seven-role contracts, state transitions, recovery rules, and planned
+per-job approval gate are documented in [`WORKFLOW.md`](WORKFLOW.md). The
+runner remains draft-only: status-feed setup does not authorize or enable
+application submission.
+
 Each run emails a digest to `config.json` → `notify.to_email` (defaults to
 your own address) — either the day's matches or an explicit "no matches
 today" email, so you get a signal every 24 hours either way.
@@ -72,7 +100,9 @@ python -m playwright install chromium
 
 Copy `.env.example` to `.env` and add your own `GEMINI_API_KEY` and
 `RESEND_API_KEY` (aistudio.google.com/apikey / resend.com). Never commit
-`.env` — it's already in `.gitignore`.
+`.env` — it's already in `.gitignore`. Keep the tracked `.env.example` as
+placeholders only. If a real key was put in that example file, revoke it and
+create a replacement before using the agent.
 
 Edit `profile.json` if anything about your background changes, and
 `config.json` to:
@@ -92,9 +122,11 @@ python main.py
 ```
 
 Output lands in `output/report_<timestamp>.pdf` (the one emailed to you),
-plus `.html` (same content, for quickly opening in a browser) and `.json`
-(raw data, useful if you want to script something on top of it later) — all
-three gitignored, never committed.
+`.html` (same content, for quickly opening in a browser), `.json` (raw data),
+and one `resume_<timestamp>_<job>.html` per valid tailored resume. Resume
+drafts are built by selecting and ordering exact highlights and skills from
+`profile.json`; the source PDF is left unchanged. All output is gitignored and
+never committed.
 
 ## Adding jobs manually (e.g. from Naukri)
 
@@ -106,8 +138,9 @@ pipeline as everything else.
 
 ## Cost
 
-Each run calls the Gemini API once per shortlisted job (not per job fetched —
-only ones that clear `min_match_score`), using `gemini-3.6-flash` on the free
+Each run calls the Gemini API up to twice per shortlisted job (resume evidence
+selection and application-material drafting; not per job fetched — only ones
+that clear `min_match_score`), using `gemini-3.6-flash` on the free
 tier by default (see `config.json` → `gemini_model`; `gemini-2.5-flash` was
 the original choice but Google retired it for new API keys — confirmed via
 a live 404 from the API itself, not just docs). One run a day for a

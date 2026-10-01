@@ -13,6 +13,8 @@ class Job:
     posted_date: Optional[str] = None
     match_score: float = 0.0
     match_reasons: list = field(default_factory=list)
+    draft_resume: Optional[dict] = None
+    resume_review: Optional[dict] = None
     draft_cover_note: Optional[str] = None
     draft_qa: Optional[list] = None
 

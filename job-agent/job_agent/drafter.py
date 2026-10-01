@@ -13,6 +13,16 @@ import os
 from .models import Job
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+PROFILE_EVIDENCE_FIELDS = (
+    "years_experience",
+    "current_title",
+    "current_company",
+    "summary",
+    "skills",
+    "experience",
+    "education",
+    "certifications",
+)
 
 SYSTEM_PROMPT = """You are helping a real job candidate draft application materials. \
 You MUST only use facts given to you in the candidate profile -- never invent \
@@ -46,8 +56,9 @@ Respond with ONLY the JSON, no other text."""
 def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
     import requests
 
+    profile_evidence = {key: profile[key] for key in PROFILE_EVIDENCE_FIELDS if key in profile}
     prompt = USER_PROMPT_TEMPLATE.format(
-        profile_json=json.dumps(profile, indent=2),
+        profile_json=json.dumps(profile_evidence, indent=2),
         title=job.title,
         company=job.company,
         location=job.location,

@@ -1,6 +1,154 @@
 // ============ YEAR ============
 document.getElementById('year').textContent = new Date().getFullYear();
 
+// ============ JOB AGENT STATUS ============
+(function jobAgentStatus() {
+  const statusUrl = 'https://shrihari-portfolio-ai.shriharigamer.workers.dev/status';
+  const statusEl = document.getElementById('agentWorldStatus');
+  const updatedEl = document.getElementById('agentWorldUpdated');
+  const worldEl = document.querySelector('.agent-world');
+  const liveEl = document.querySelector('.agent-world__live');
+  const refreshButton = document.getElementById('agentWorldRefresh');
+  const askButton = document.getElementById('agentWorldAsk');
+  const assistantLauncher = document.getElementById('aiLauncher');
+  if (!statusEl || !updatedEl || !worldEl || !liveEl || !refreshButton) return;
+
+  window.setTimeout(() => {
+    if (window.agentWorldReady) return;
+    const canvas = document.getElementById('agentNetworkCanvas');
+    const fallback = document.getElementById('agentNetworkFallback');
+    if (canvas && fallback) {
+      canvas.hidden = true;
+      fallback.hidden = false;
+    }
+  }, 12000);
+
+  const countKeys = ['discovered', 'shortlisted', 'drafted', 'resumes_tailored', 'awaiting_review', 'applied'];
+  const countEls = new Map(Array.from(document.querySelectorAll('[data-status-count]'))
+    .map(element => [element.dataset.statusCount, element]));
+  const agentEls = new Map(Array.from(document.querySelectorAll('[data-agent]'))
+    .map(element => [element.dataset.agent, { card: element, label: element.querySelector('[data-agent-status]') }]));
+  const labels = { planned: 'Planned', idle: 'Idle', running: 'Working', completed: 'Complete', failed: 'Needs attention' };
+  const agentNames = {
+    'role-scout': ['Mira Patel', 'Role Scout', 'fa-binoculars'],
+    'fit-analyst': ['Arjun Rao', 'Fit Analyst', 'fa-chart-simple'],
+    'resume-tailor': ['Leena Das', 'Resume Tailor', 'fa-file-lines'],
+    'application-writer': ['Kabir Shah', 'Application Writer', 'fa-pen-to-square'],
+    'application-reviewer': ['Nisha Menon', 'Application Reviewer', 'fa-clipboard-check'],
+    'application-coordinator': ['Dev Malhotra', 'Application Coordinator', 'fa-user-check'],
+    'feedback-analyst': ['Tara Iyer', 'Feedback Analyst', 'fa-arrows-rotate'],
+  };
+  const selectionName = document.getElementById('agentNetworkName');
+  const selectionRole = document.getElementById('agentNetworkRole');
+  const selectionStatus = document.getElementById('agentNetworkAgentStatus');
+  const selectionIcon = document.querySelector('.agent-network__selection-mark i');
+
+  function selectAgentCard(id, notifyScene = true) {
+    const agent = agentNames[id];
+    const entry = agentEls.get(id);
+    if (!agent || !entry) return;
+    agentEls.forEach(({ card }) => {
+      const selected = card.dataset.agent === id;
+      card.classList.toggle('is-selected', selected);
+      card.setAttribute('aria-pressed', String(selected));
+    });
+    if (selectionName) selectionName.textContent = agent[0];
+    if (selectionRole) selectionRole.textContent = agent[1];
+    if (selectionStatus) {
+      const state = entry.label.dataset.status || entry.card.dataset.status || 'unknown';
+      selectionStatus.textContent = ({
+        unknown: 'Status unavailable',
+        planned: 'Planned role',
+        idle: 'Ready for run',
+        running: 'Working now',
+        completed: 'Stage complete',
+        failed: 'Needs attention',
+      })[state] || 'Status unavailable';
+    }
+    if (selectionIcon) selectionIcon.className = `fa-solid ${agent[2]}`;
+    if (notifyScene) window.dispatchEvent(new CustomEvent('agent-world-select-request', { detail: { id } }));
+  }
+
+  agentEls.forEach(({ card }, id) => card.addEventListener('click', () => selectAgentCard(id)));
+  window.addEventListener('agent-world-selected', (event) => selectAgentCard(event.detail?.id, false));
+
+  function showUnavailable(message) {
+    liveEl.classList.remove('is-live', 'is-stale');
+    liveEl.classList.add('is-unavailable');
+    statusEl.textContent = 'Live status unavailable';
+    updatedEl.textContent = message;
+    agentEls.forEach(({ card, label }) => {
+      label.textContent = 'Unknown';
+      label.removeAttribute('data-status');
+      card.dataset.status = 'unknown';
+    });
+    const selectedCard = document.querySelector('.agent-figure[aria-pressed="true"]');
+    if (selectedCard) selectAgentCard(selectedCard.dataset.agent, false);
+    window.dispatchEvent(new CustomEvent('agent-status-update', { detail: { agents: [], unavailable: true } }));
+    countEls.forEach(element => { element.textContent = '--'; });
+  }
+
+  async function refresh() {
+    refreshButton.disabled = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    try {
+      const response = await fetch(statusUrl, { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('Status endpoint returned an error');
+      const data = await response.json();
+      const updatedAt = Date.parse(data.updated_at || '');
+      if (data.schema_version !== 1 || !data.counts || !Array.isArray(data.agents) || !Number.isFinite(updatedAt)) {
+        throw new Error('Status feed has an invalid format');
+      }
+      const stale = Date.now() - updatedAt > 36 * 60 * 60 * 1000;
+      if (stale) {
+        liveEl.classList.remove('is-live', 'is-unavailable');
+        liveEl.classList.add('is-stale');
+        statusEl.textContent = 'Status is stale';
+      } else {
+        liveEl.classList.remove('is-stale', 'is-unavailable');
+        liveEl.classList.add('is-live');
+        statusEl.textContent = `Workflow ${data.run_status || 'unknown'}`;
+      }
+      countKeys.forEach(key => {
+        const value = data.counts[key];
+        if (!Number.isInteger(value) || value < 0) throw new Error('Status counts are invalid');
+        if (countEls.has(key)) countEls.get(key).textContent = String(value);
+      });
+      const statusById = new Map(data.agents.map(agent => [agent.id, agent.status]));
+      agentEls.forEach(({ card, label }, id) => {
+        const value = statusById.get(id);
+        if (!labels[value]) throw new Error('Agent status is invalid');
+        label.textContent = labels[value];
+        label.dataset.status = value;
+        card.dataset.status = value;
+      });
+      const selectedCard = document.querySelector('.agent-figure[aria-pressed="true"]');
+      if (selectedCard) selectAgentCard(selectedCard.dataset.agent, false);
+      window.dispatchEvent(new CustomEvent('agent-status-update', { detail: { agents: data.agents } }));
+      updatedEl.textContent = `${stale ? 'Last reported' : 'Updated'} ${new Date(updatedAt).toLocaleString()}. Aggregate counts only; applications are not submitted by this system.`;
+    } catch (error) {
+      showUnavailable('The status service is not configured or could not be reached. Applications are not submitted by this system.');
+    } finally {
+      clearTimeout(timeout);
+      refreshButton.disabled = false;
+    }
+  }
+
+  refreshButton.addEventListener('click', refresh);
+  if (askButton && assistantLauncher) {
+    askButton.addEventListener('click', () => assistantLauncher.click());
+  }
+  if ('IntersectionObserver' in window) {
+    const visibilityObserver = new IntersectionObserver(([entry]) => {
+      document.body.classList.toggle('agent-world-active', entry.isIntersecting);
+    }, { threshold: 0.05 });
+    visibilityObserver.observe(document.getElementById('agentNetworkCanvas') || worldEl);
+  }
+  refresh();
+  window.setInterval(refresh, 5 * 60 * 1000);
+})();
+
 // ============ THEME TOGGLE ============
 const themeToggle = document.getElementById('themeToggle');
 const root = document.documentElement;
@@ -537,9 +685,25 @@ contactForm.addEventListener('submit', async (e) => {
   const synth = window.speechSynthesis || null;
   let voiceEnabled = localStorage.getItem('aiVoiceEnabled') !== 'false';
   let currentAudio = null;
+  let ttsController = null;
+
+  const AI_WORKER_URL = 'https://shrihari-portfolio-ai.shriharigamer.workers.dev';
+
+  function cleanSpeechText(text) {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+      .replace(/[📧📱📍]/g, '')
+      .replace(/https?:\/\/\S+/g, '')
+      .trim();
+  }
 
   function stopVoice() {
     if (synth) synth.cancel();
+    if (ttsController) {
+      ttsController.abort();
+      ttsController = null;
+    }
     if (currentAudio) {
       currentAudio.pause();
       currentAudio = null;
@@ -567,12 +731,7 @@ contactForm.addEventListener('submit', async (e) => {
   function speakWithBrowserTTS(text) {
     if (!synth || !text) return;
     synth.cancel();
-    const clean = text
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
-      .replace(/[📧📱📍]/g, '')
-      .replace(/https?:\/\/\S+/g, '')
-      .trim();
+    const clean = cleanSpeechText(text);
     if (!clean) return;
     const utter = new SpeechSynthesisUtterance(clean);
     const voice = pickVoice();
@@ -583,6 +742,56 @@ contactForm.addEventListener('submit', async (e) => {
     utter.onend = () => voiceToggle && voiceToggle.classList.remove('speaking');
     utter.onerror = () => voiceToggle && voiceToggle.classList.remove('speaking');
     synth.speak(utter);
+  }
+
+  async function speakWithCartesia(text) {
+    const clean = cleanSpeechText(text);
+    if (!clean || !AI_WORKER_URL) throw new Error('Cloned voice is unavailable');
+
+    stopVoice();
+    const controller = new AbortController();
+    ttsController = controller;
+    const timeout = setTimeout(() => controller.abort(), 22000);
+    try {
+      const response = await fetch(`${AI_WORKER_URL}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error('Cloned voice request failed');
+      const audioBlob = await response.blob();
+      if (!voiceEnabled || ttsController !== controller) return;
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      currentAudio = audio;
+      ttsController = null;
+
+      const releaseAudio = () => {
+        URL.revokeObjectURL(audioUrl);
+        if (currentAudio === audio) currentAudio = null;
+        voiceToggle && voiceToggle.classList.remove('speaking');
+      };
+      audio.addEventListener('playing', () => voiceToggle && voiceToggle.classList.add('speaking'), { once: true });
+      audio.addEventListener('ended', releaseAudio, { once: true });
+      audio.addEventListener('error', releaseAudio, { once: true });
+      try {
+        await audio.play();
+      } catch (error) {
+        releaseAudio();
+        throw error;
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (ttsController === controller) ttsController = null;
+    }
+  }
+
+  function speakWithVoiceFallback(text) {
+    speakWithCartesia(text).catch(() => {
+      if (voiceEnabled) speakWithBrowserTTS(text);
+    });
   }
 
   function playClip(url, fallbackText) {
@@ -597,9 +806,9 @@ contactForm.addEventListener('submit', async (e) => {
     audio.addEventListener('error', () => {
       voiceToggle && voiceToggle.classList.remove('speaking');
       if (currentAudio === audio) currentAudio = null;
-      speakWithBrowserTTS(fallbackText);
+      speakWithVoiceFallback(fallbackText);
     });
-    audio.play().catch(() => speakWithBrowserTTS(fallbackText));
+    audio.play().catch(() => speakWithVoiceFallback(fallbackText));
   }
 
   function speak(text, intentId) {
@@ -608,7 +817,7 @@ contactForm.addEventListener('submit', async (e) => {
     if (clipUrl) {
       playClip(clipUrl, text);
     } else {
-      speakWithBrowserTTS(text);
+      speakWithVoiceFallback(text);
     }
   }
 
@@ -871,7 +1080,6 @@ contactForm.addEventListener('submit', async (e) => {
   // Set this to the workers.dev URL printed by `npx wrangler deploy` in ai-worker/.
   // Left blank until deployed -- askLiveAI() no-ops (returns null) until it's set,
   // so the widget just runs on the local KB alone in the meantime.
-  const AI_WORKER_URL = 'https://shrihari-portfolio-ai.shriharigamer.workers.dev';
   const AI_TIMEOUT_MS = 10000;
 
   async function askLiveAI(userText) {

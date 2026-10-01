@@ -19,6 +19,9 @@ from job_agent.matcher import score_and_filter
 from job_agent.drafter import draft_shortlist
 from job_agent.report import write_report
 from job_agent.notifier import send_digest
+from job_agent.resume_tailor import tailor_shortlist
+from job_agent.reviewer import review_resume_drafts
+from job_agent.status import StatusPublisher
 from job_agent.sources import greenhouse, lever, indeed, linkedin, naukri, manual
 
 
@@ -85,29 +88,84 @@ def collect_jobs(config: dict) -> list[Job]:
 
 
 def main():
+    status = StatusPublisher()
     profile = load_json("profile.json")
     config = load_json("config.json")
 
+    status.publish("role-scout", "running")
     all_jobs = collect_jobs(config)
     print(f"\nTotal jobs fetched (before scoring/dedup): {len(all_jobs)}")
+    status.publish("fit-analyst", "running", discovered=len(all_jobs))
 
     shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35))
     print(f"Shortlist after scoring/dedup (>= {config.get('min_match_score', 35)} match): {len(shortlist)}")
 
+    status.publish(
+        "resume-tailor", "running", discovered=len(all_jobs),
+        shortlisted=len(shortlist),
+    )
+    tailor_shortlist(shortlist, profile, config.get("gemini_model", "gemini-3.6-flash"))
+    resumes_tailored = sum(
+        job.draft_resume is not None and bool(job.resume_review and job.resume_review.get("passed"))
+        for job in shortlist
+    )
+
     if shortlist:
         print("\nDrafting application materials for the shortlist...")
+        status.publish(
+            "application-writer", "running", discovered=len(all_jobs),
+            shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
+        )
         draft_shortlist(shortlist, profile, config.get("gemini_model", "gemini-3.6-flash"))
     else:
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")
 
+    status.publish(
+        "application-reviewer", "running", discovered=len(all_jobs),
+        shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
+    )
+    resumes_reviewed = review_resume_drafts(shortlist, profile)
+    resumes_tailored = resumes_reviewed
+    status.publish(
+        "application-reviewer", "running", discovered=len(all_jobs),
+        shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
+        phase_complete=True,
+    )
+
     html_path, pdf_path, json_path = write_report(shortlist, profile)
+    drafted_count = sum(
+        bool(job.draft_cover_note)
+        and not job.draft_cover_note.startswith("[Drafting failed")
+        for job in shortlist
+    )
+    status.publish(
+        "application-writer", "running", discovered=len(all_jobs),
+        shortlisted=len(shortlist), drafted=drafted_count,
+        resumes_tailored=resumes_tailored,
+        awaiting_review=drafted_count,
+    )
     print(f"\nReport written to:\n  {html_path}\n  {pdf_path}\n  {json_path}")
 
     print("\nSending daily digest...")
-    send_digest(shortlist, profile, config, pdf_path)
+    try:
+        send_digest(shortlist, profile, config, pdf_path)
+    except Exception:
+        status.publish(
+            "application-coordinator", "failed", discovered=len(all_jobs),
+            shortlisted=len(shortlist), drafted=drafted_count,
+            resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
+            phase_complete=True,
+        )
+        raise
 
     print("\nDone. Review any drafted notes before applying manually on the original listing.")
+    status.publish(
+        "application-coordinator", "completed", discovered=len(all_jobs),
+        shortlisted=len(shortlist), drafted=drafted_count,
+        resumes_tailored=resumes_tailored,
+        awaiting_review=drafted_count, phase_complete=True,
+    )
 
 
 if __name__ == "__main__":

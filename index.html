@@ -303,10 +303,9 @@
   <section class="section" id="ai-work">
     <div class="container">
       <p class="section__eyebrow" data-reveal>AI &amp; Automation</p>
-      <h2 class="section__title" data-reveal>How I use AI in my day-to-day QA work</h2>
+      <h2 class="section__title" data-reveal>Seven specialists. One connected workflow.</h2>
       <p class="section__sub" data-reveal>
-        AI tools are part of my regular testing and automation workflow — not a novelty, but something I lean on
-        to debug faster and ship more reliable checks.
+        A small engineering ecosystem for discovering the right roles, shaping evidence-backed applications, and learning from each outcome.
       </p>
 
       <div class="ai-work__grid">
@@ -351,6 +350,73 @@
           </ul>
         </div>
       </div>
+
+      <section class="agent-world" aria-labelledby="agentWorldTitle">
+        <div class="agent-world__heading">
+          <div>
+            <p class="section__eyebrow">Job Application Network</p>
+            <h3 id="agentWorldTitle">The agent engineering team</h3>
+          </div>
+          <div class="agent-world__live">
+            <span class="agent-world__live-dot" aria-hidden="true"></span>
+            <span id="agentWorldStatus" role="status" aria-live="polite">Checking live workflow status...</span>
+            <button class="agent-world__assistant" id="agentWorldAsk" type="button" aria-label="Open AI assistant">
+              <i class="fa-solid fa-comments" aria-hidden="true"></i> Ask assistant
+            </button>
+            <button class="agent-world__refresh" id="agentWorldRefresh" type="button" aria-label="Refresh agent status" title="Refresh agent status">
+              <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <dl class="agent-world__counts" aria-label="Aggregate job workflow counts">
+          <div><dt>Discovered</dt><dd data-status-count="discovered">--</dd></div>
+          <div><dt>Shortlisted</dt><dd data-status-count="shortlisted">--</dd></div>
+          <div><dt>Drafted</dt><dd data-status-count="drafted">--</dd></div>
+          <div><dt>Resumes tailored</dt><dd data-status-count="resumes_tailored">--</dd></div>
+          <div><dt>Awaiting review</dt><dd data-status-count="awaiting_review">--</dd></div>
+          <div><dt>Applied</dt><dd data-status-count="applied">--</dd></div>
+        </dl>
+
+        <div class="agent-network" id="agentNetwork">
+          <canvas id="agentNetworkCanvas" aria-label="Interactive 3D network of seven miniature engineer agents around the job application portal"></canvas>
+          <p class="agent-network__fallback" id="agentNetworkFallback" hidden>3D view is unavailable in this browser. Choose an engineer below to inspect their workflow role and status.</p>
+          <div class="agent-network__topline" aria-hidden="true">
+            <span><i class="fa-solid fa-circle-nodes"></i> APPLICATION EXCHANGE</span>
+            <span>7 NODES <b></b> PRIVATE WORKFLOW</span>
+          </div>
+          <div class="agent-network__selection" id="agentNetworkSelection" aria-live="polite">
+            <span class="agent-network__selection-mark" aria-hidden="true"><i class="fa-solid fa-binoculars"></i></span>
+            <span><strong id="agentNetworkName">Mira Patel</strong><small id="agentNetworkRole">Role Scout</small></span>
+            <span class="agent-network__selection-state" id="agentNetworkAgentStatus">Waiting for run</span>
+          </div>
+        </div>
+
+        <div class="agent-world__team" id="agentWorldTeam" aria-label="Select an agent miniature">
+          <button class="agent-figure is-selected" data-agent="role-scout" type="button" aria-pressed="true">
+            <span class="agent-figure__copy"><strong>Mira Patel</strong><span>Role Scout</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="fit-analyst" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Arjun Rao</strong><span>Fit Analyst</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="resume-tailor" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Leena Das</strong><span>Resume Tailor</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="application-writer" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Kabir Shah</strong><span>Application Writer</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="application-reviewer" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Nisha Menon</strong><span>Application Reviewer</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="application-coordinator" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Dev Malhotra</strong><span>Application Coordinator</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+          <button class="agent-figure" data-agent="feedback-analyst" type="button" aria-pressed="false">
+            <span class="agent-figure__copy"><strong>Tara Iyer</strong><span>Feedback Analyst</span><span class="agent-figure__status" data-agent-status>Checking</span></span>
+          </button>
+        </div>
+        <p class="agent-world__updated" id="agentWorldUpdated">The local job-agent tailors reviewable resume drafts from verified profile facts. These figures are role personas; only aggregate status is public. Applications are not submitted.</p>
+      </section>
     </div>
   </section>
 
@@ -632,5 +698,6 @@
 </div>
 
 <script src="js/script.js"></script>
+<script type="module" src="js/agent-world.js"></script>
 </body>
 </html>

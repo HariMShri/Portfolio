@@ -2,6 +2,7 @@ import html
 import json
 import os
 from datetime import datetime
+from typing import Optional
 from .models import Job
 
 CSS = """
@@ -26,6 +27,10 @@ h1 { font-size: 1.5rem; margin-bottom: 4px; }
 .qa-item { margin-bottom: 10px; }
 .qa-item .q { font-weight: 600; font-size: 0.85rem; }
 a.applylink { display: inline-block; margin-top: 12px; font-size: 0.85rem; font-weight: 600; }
+.resume-preview { border-top: 1px solid #ddd; margin-top: 16px; padding-top: 12px; }
+.resume-preview h5 { margin: 12px 0 4px; font-size: 0.85rem; }
+.resume-preview ul { margin: 4px 0 8px; padding-left: 20px; }
+.resume-contact { color: #666; font-size: 0.8rem; }
 """
 
 
@@ -35,9 +40,67 @@ def _score_class(score: float) -> str:
     return "mid"
 
 
-def render_html(jobs: list[Job], profile: dict) -> str:
+def _resume_content(job: Job, profile: dict) -> str:
+    plan = job.draft_resume
+    if not plan or not (job.resume_review and job.resume_review.get("passed")):
+        return ""
+
+    contact = " | ".join(
+        value for value in (
+            profile.get("email", ""),
+            profile.get("phone", ""),
+            profile.get("location", ""),
+            profile.get("linkedin_url", ""),
+        ) if value
+    )
+    experience_html = []
+    for selection in plan.get("experience", []):
+        experience = profile["experience"][selection["experience_index"]]
+        highlights = "".join(
+            f"<li>{html.escape(experience['highlights'][index])}</li>"
+            for index in selection["highlight_indices"]
+        )
+        company = html.escape(experience.get("company", ""))
+        title = html.escape(experience.get("title", ""))
+        dates = html.escape(experience.get("dates", ""))
+        client = html.escape(experience.get("client", ""))
+        experience_html.append(
+            f"<h5>{title} | {company}</h5><p>{dates}"
+            f"{' | Client: ' + client if client else ''}</p><ul>{highlights}</ul>"
+        )
+
+    skills = " | ".join(html.escape(skill) for skill in plan["skills"])
+    education = "".join(
+        f"<li>{html.escape(item.get('degree', ''))} - "
+        f"{html.escape(item.get('institution', ''))} ({html.escape(item.get('year', ''))})</li>"
+        for item in profile.get("education", [])
+    )
+    certifications = "".join(f"<li>{html.escape(item)}</li>" for item in profile.get("certifications", []))
+    return f"""<header><h1>{html.escape(profile.get('name', ''))}</h1>
+      <p class="resume-contact">{html.escape(contact)}</p>
+      <h2>{html.escape(job.title)} | Resume draft for {html.escape(job.company)}</h2></header>
+      <section><h3>Professional Summary</h3><p>{html.escape(profile.get('summary', ''))}</p></section>
+      <section><h3>Core Skills</h3><p>{skills}</p></section>
+      <section><h3>Professional Experience</h3>{''.join(experience_html)}</section>
+      <section><h3>Education</h3><ul>{education}</ul></section>
+      <section><h3>Certifications</h3><ul>{certifications}</ul></section>
+      <footer>Draft tailored by selecting and reordering verified profile facts. Review before use; the source PDF is unchanged.</footer>"""
+
+
+def render_resume_html(job: Job, profile: dict) -> str:
+    content = _resume_content(job, profile)
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Resume Draft - {html.escape(profile.get('name', ''))}</title>
+<style>body{{font-family:Arial,sans-serif;max-width:850px;margin:36px auto;padding:0 24px;color:#202124;line-height:1.5}}
+h1{{font-size:26px;margin-bottom:0}}h2{{font-size:17px}}h3{{font-size:14px;text-transform:uppercase;border-bottom:1px solid #bbb;padding-bottom:4px}}
+h5{{font-size:13px;margin-bottom:0}}p,li{{font-size:12px}}ul{{padding-left:20px}}.resume-contact,footer{{color:#555;font-size:10px}}
+@media print{{body{{margin:0 auto;padding:0}}}}</style></head><body>{content}</body></html>"""
+
+
+def render_html(jobs: list[Job], profile: dict, resume_files: Optional[dict[int, str]] = None) -> str:
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
     job_blocks = []
+    resume_files = resume_files or {}
     for job in jobs:
         reasons_html = "".join(f"<li>{html.escape(r)}</li>" for r in job.match_reasons)
         draft_html = ""
@@ -54,6 +117,15 @@ def render_html(jobs: list[Job], profile: dict) -> str:
               {'<h4>Drafted Q&amp;A</h4>' + qa_html if qa_html else ''}
             </div>
             """
+        resume_content = _resume_content(job, profile)
+        resume_html = ""
+        if resume_content:
+            resume_link = resume_files.get(id(job))
+            link_html = (
+                f'<p><a class="applylink" href="{html.escape(resume_link)}">Open standalone resume draft</a></p>'
+                if resume_link else ""
+            )
+            resume_html = f'<div class="draft resume-preview"><h4>Tailored Resume Draft (review before using)</h4>{resume_content}{link_html}</div>'
         job_blocks.append(f"""
         <div class="job">
           <h2>{html.escape(job.title)}</h2>
@@ -62,6 +134,7 @@ def render_html(jobs: list[Job], profile: dict) -> str:
             &middot; <span class="score {_score_class(job.match_score)}">{job.match_score:.0f} match</span></div>
           <ul class="reasons">{reasons_html}</ul>
           {draft_html}
+          {resume_html}
           {'<a class="applylink" href="' + html.escape(job.url) + '" target="_blank">Open original listing &rarr;</a>' if job.url else ''}
         </div>
         """)
@@ -150,6 +223,41 @@ def render_pdf(jobs: list[Job], profile: dict, out_path: str) -> None:
                 story.append(Paragraph(esc(qa.get("question", "")), qa_q_style))
                 story.append(Paragraph(esc(qa.get("answer", "")), qa_a_style))
 
+        if _resume_content(job, profile):
+            story.append(Paragraph("TAILORED RESUME DRAFT (review before using)", draft_label_style))
+            story.append(Paragraph(esc(profile.get("name", "")), job_title_style))
+            story.append(Paragraph(
+                f"{esc(job.title)} &mdash; tailored for {esc(job.company)}", job_sub_style
+            ))
+            story.append(Paragraph(esc(profile.get("email", "")) + " | " + esc(profile.get("phone", ""))
+                                   + " | " + esc(profile.get("location", "")), meta_style))
+            story.append(Paragraph("PROFESSIONAL SUMMARY", draft_label_style))
+            story.append(Paragraph(esc(profile.get("summary", "")), draft_body_style))
+            story.append(Paragraph("CORE SKILLS: " + esc(" | ".join(job.draft_resume["skills"])), draft_body_style))
+            story.append(Paragraph("PROFESSIONAL EXPERIENCE", draft_label_style))
+            for selection in job.draft_resume["experience"]:
+                experience = profile["experience"][selection["experience_index"]]
+                story.append(Paragraph(
+                    f"{esc(experience.get('title', ''))} &mdash; {esc(experience.get('company', ''))}",
+                    qa_q_style,
+                ))
+                story.append(Paragraph(
+                    f"{esc(experience.get('dates', ''))} &middot; {esc(experience.get('location', ''))}",
+                    meta_style,
+                ))
+                for highlight_index in selection["highlight_indices"]:
+                    story.append(Paragraph(
+                        f"&bull; {esc(experience['highlights'][highlight_index])}", reason_style
+                    ))
+            story.append(Paragraph("EDUCATION & CERTIFICATIONS", draft_label_style))
+            for education in profile.get("education", []):
+                story.append(Paragraph(
+                    f"{esc(education.get('degree', ''))} &mdash; {esc(education.get('institution', ''))} ({esc(education.get('year', ''))})",
+                    draft_body_style,
+                ))
+            for certification in profile.get("certifications", []):
+                story.append(Paragraph(f"&bull; {esc(certification)}", reason_style))
+
         if job.url:
             story.append(Paragraph(f'<link href="{esc(job.url)}">Open original listing &rarr;</link>', link_style))
 
@@ -170,8 +278,16 @@ def write_report(jobs: list[Job], profile: dict, out_dir: str = "output") -> tup
     pdf_path = os.path.join(out_dir, f"report_{timestamp}.pdf")
     json_path = os.path.join(out_dir, f"report_{timestamp}.json")
 
+    resume_files = {}
+    for index, job in enumerate(jobs, start=1):
+        if _resume_content(job, profile):
+            filename = f"resume_{timestamp}_{index}.html"
+            with open(os.path.join(out_dir, filename), "w", encoding="utf-8") as resume_file:
+                resume_file.write(render_resume_html(job, profile))
+            resume_files[id(job)] = filename
+
     with open(html_path, "w", encoding="utf-8") as f:
-        f.write(render_html(jobs, profile))
+        f.write(render_html(jobs, profile, resume_files))
     render_pdf(jobs, profile, pdf_path)
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump([j.to_dict() for j in jobs], f, indent=2)
