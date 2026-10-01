@@ -85,9 +85,18 @@ def draft_for_job(job: Job, profile: dict, api_key: str, model: str) -> Job:
         parsed = json.loads(text)
         job.draft_cover_note = parsed.get("cover_note")
         job.draft_qa = parsed.get("qa", [])
-    except Exception as e:
-        print(f"  [drafter] generation failed ({type(e).__name__})")
-        job.draft_cover_note = f"[Drafting failed for this job: {e}]"
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        print(f"  [drafter] Gemini request failed (HTTP {status})")
+        job.draft_cover_note = f"[Drafting failed: Gemini returned HTTP {status}]"
+        job.draft_qa = []
+    except json.JSONDecodeError:
+        print("  [drafter] Gemini returned a response that was not valid JSON")
+        job.draft_cover_note = "[Drafting failed: Gemini returned invalid JSON]"
+        job.draft_qa = []
+    except Exception as exc:
+        print(f"  [drafter] generation failed ({type(exc).__name__})")
+        job.draft_cover_note = f"[Drafting failed for this job: {exc}]"
         job.draft_qa = []
     return job
 

@@ -113,6 +113,21 @@ previous roles when relevant; never alter the indexed source facts. Return exact
         plan, issues = validate_resume_plan(parsed, profile)
         job.draft_resume = plan
         job.resume_review = {"passed": not issues, "issues": issues}
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        print(f"  [resume-tailor] Gemini request failed (HTTP {status})")
+        job.draft_resume = None
+        job.resume_review = {
+            "passed": False,
+            "issues": [f"Gemini returned HTTP {status}; check the Actions log and model/API access."],
+        }
+    except json.JSONDecodeError:
+        print("  [resume-tailor] Gemini returned a response that was not valid JSON")
+        job.draft_resume = None
+        job.resume_review = {
+            "passed": False,
+            "issues": ["Gemini returned invalid JSON; review the model response format."],
+        }
     except Exception as exc:
         print(f"  [resume-tailor] generation failed ({type(exc).__name__})")
         job.draft_resume = None

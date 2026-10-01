@@ -146,6 +146,50 @@ class ResumePlanValidationTests(unittest.TestCase):
         self.assertNotIn(profile["location"], prompt)
         self.assertNotIn(profile["portfolio_url"], prompt)
 
+    def test_gemini_http_failure_logs_status_without_response_body(self):
+        profile = {**self.profile, "summary": "Verified summary."}
+        response = Mock()
+        response.raise_for_status.side_effect = requests.HTTPError(
+            "provider failure", response=Mock(status_code=403, text="private provider body")
+        )
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+
+        with patch("requests.post", return_value=response), patch("builtins.print") as print_mock:
+            draft_for_job(job, profile, "test-secret", "test-model")
+
+        logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("HTTP 403", logged_text)
+        self.assertNotIn("private provider body", logged_text)
+        self.assertNotIn("test-secret", logged_text)
+
+    def test_resume_tailor_http_failure_logs_status_without_response_body(self):
+        response = Mock()
+        response.raise_for_status.side_effect = requests.HTTPError(
+            "provider failure", response=Mock(status_code=429, text="private provider body")
+        )
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+
+        with patch("job_agent.resume_tailor.requests.post", return_value=response), patch("builtins.print") as print_mock:
+            tailor_resume_for_job(job, self.profile, "test-secret", "test-model")
+
+        logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("HTTP 429", logged_text)
+        self.assertNotIn("private provider body", logged_text)
+        self.assertNotIn("test-secret", logged_text)
+        self.assertFalse(job.resume_review["passed"])
+
+    def test_invalid_gemini_json_has_clear_safe_diagnostic(self):
+        response = Mock()
+        response.json.return_value = {"output_text": "not a JSON document"}
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+
+        with patch("job_agent.resume_tailor.requests.post", return_value=response), patch("builtins.print") as print_mock:
+            tailor_resume_for_job(job, self.profile, "test-secret", "test-model")
+
+        logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("not valid JSON", logged_text)
+        self.assertNotIn("test-secret", logged_text)
+
     def test_report_writer_creates_a_linked_standalone_resume(self):
         profile = {
             "name": "Candidate",
