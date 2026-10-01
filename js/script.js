@@ -94,6 +94,20 @@ document.getElementById('year').textContent = new Date().getFullYear();
     const timeout = setTimeout(() => controller.abort(), 7000);
     try {
       const response = await fetch(statusUrl, { cache: 'no-store', signal: controller.signal });
+      if (response.status === 404) {
+        liveEl.classList.remove('is-live', 'is-stale');
+        liveEl.classList.add('is-unavailable');
+        statusEl.textContent = 'Waiting for first workflow run';
+        updatedEl.textContent = 'Add STATUS_API_TOKEN as a GitHub Actions secret and STATUS_API_URL as a repository variable, then run Daily Job Search Digest. No application data is public.';
+        agentEls.forEach(({ card, label }) => {
+          label.textContent = 'Waiting';
+          label.removeAttribute('data-status');
+          card.dataset.status = 'unknown';
+        });
+        countEls.forEach(element => { element.textContent = '--'; });
+        window.dispatchEvent(new CustomEvent('agent-status-update', { detail: { agents: [], unavailable: true } }));
+        return;
+      }
       if (!response.ok) throw new Error('Status endpoint returned an error');
       const data = await response.json();
       const updatedAt = Date.parse(data.updated_at || '');

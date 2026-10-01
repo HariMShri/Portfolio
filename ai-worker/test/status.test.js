@@ -82,6 +82,14 @@ test("reports unavailable when no status store is configured", async () => {
   assert.equal(response.status, 503);
 });
 
+test("reports waiting when the configured status store has no published snapshot", async () => {
+  const response = await worker.fetch(new Request("https://worker.test/status"), {
+    JOB_STATUS: { async get() { return null; } },
+  });
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error, "status not yet published");
+});
+
 test("allows exact localhost origins for development status reads", async () => {
   const response = await worker.fetch(new Request("https://worker.test/status", {
     headers: { Origin: "http://127.0.0.1:8000" },

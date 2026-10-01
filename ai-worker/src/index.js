@@ -121,7 +121,7 @@ async function handlePublicStatus(request, env) {
 
   try {
     const status = await env.JOB_STATUS.get("latest", "json");
-    if (!status) return json({ error: "status unavailable" }, 503, origin);
+    if (!status) return json({ error: "status not yet published" }, 404, origin);
     return new Response(JSON.stringify(status), {
       status: 200,
       headers: {
