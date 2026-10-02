@@ -162,15 +162,21 @@ pipeline as everything else.
 
 ## Cost
 
-Each run calls the Gemini API up to twice per shortlisted job (resume evidence
-Each run calls Gemini at most twice for each of the top four shortlisted jobs
+Each run calls Gemini at most twice for each of the top two shortlisted jobs
 by default: once for resume evidence selection and once for application
 materials. The full shortlist is still reported; change
 `config.json` → `max_ai_jobs_per_run` to adjust the number receiving AI
-materials. A rate-limit response (HTTP 429) stops further Gemini requests in
-that run. Gemini uses `gemini-3.6-flash` by default (see `config.json` →
-`gemini_model`); check current limits at ai.google.dev/gemini-api/docs/pricing
-before increasing the per-run cap.
+materials.
+
+The cap is 2 rather than 4 because of measured free-tier behaviour, not
+caution: a run on 2026-10-02 with the cap at 4 got through 6 calls before
+Gemini returned HTTP 429, and a 13-second wait was not enough to clear it.
+At 4 jobs that produced 4 tailored resumes but only 1 cover note; at 2 jobs
+the run fits inside the quota and both jobs get a complete package. A
+rate-limit response stops further Gemini requests in that run. Gemini uses
+`gemini-3.6-flash` by default (see `config.json` → `gemini_model`); check
+current limits at ai.google.dev/gemini-api/docs/pricing before raising the
+per-run cap.
 
 Originally built against the Anthropic API, then switched to Gemini to avoid
 needing a paid key. Also considered GitHub Models (would have meant zero new

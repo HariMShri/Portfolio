@@ -1,7 +1,7 @@
 {
   "max_results_per_source": 25,
   "min_match_score": 35,
-  "max_ai_jobs_per_run": 4,
+  "max_ai_jobs_per_run": 2,
 
   "greenhouse_boards": [
     "stripe", "airbnb", "cloudflare", "elastic", "gitlab", "hashicorp",
