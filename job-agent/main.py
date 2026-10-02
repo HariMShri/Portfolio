@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass  # python-dotenv not installed -- GEMINI_API_KEY must be set some other way
 
-from job_agent.models import GeminiRunState, Job
+from job_agent.models import Job
 from job_agent.matcher import score_and_filter
 from job_agent.drafter import draft_shortlist
 from job_agent.report import write_report
@@ -22,6 +22,8 @@ from job_agent.notifier import send_digest
 from job_agent.resume_tailor import tailor_shortlist
 from job_agent.reviewer import review_resume_drafts
 from job_agent.feedback_analyst import run_feedback_analysis
+from job_agent import ats_memory
+from job_agent.local_llm import available_models, wait_until_ready
 from job_agent.status import StatusPublisher
 from job_agent.sources import greenhouse, lever, indeed, linkedin, naukri, manual
 
@@ -101,40 +103,46 @@ def main():
     shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35))
     print(f"Shortlist after scoring/dedup (>= {config.get('min_match_score', 35)} match): {len(shortlist)}")
 
-    material_limit = max(0, int(config.get("max_ai_jobs_per_run", 4)))
+    material_limit = max(0, int(config.get("max_ai_jobs_per_run", 3)))
     material_jobs = shortlist[:material_limit]
     if len(material_jobs) < len(shortlist):
         print(
-            f"Preparing AI materials for the top {len(material_jobs)} shortlisted jobs "
+            f"Writing application materials for the top {len(material_jobs)} shortlisted jobs "
             f"(max_ai_jobs_per_run={material_limit}); all {len(shortlist)} remain in the report."
         )
-    gemini_state = GeminiRunState()
+
+    # Fold this run's listings into the demand counts before tailoring, so
+    # skills get ordered by what employers actually ask for.
+    memory = ats_memory.observe(all_jobs, shortlist, profile, "output")
+    print(f"  [ats-memory] {ats_memory.summarize(memory, profile)}")
+    demand = ats_memory.demand(memory)
 
     status.publish(
         "resume-tailor", "running", discovered=len(all_jobs),
         shortlisted=len(shortlist),
     )
-    tailor_shortlist(
-        material_jobs, profile, config.get("gemini_model", "gemini-3.6-flash"), gemini_state
-    )
+    tailor_shortlist(material_jobs, profile, demand)
     resumes_tailored = sum(
         job.draft_resume is not None and bool(job.resume_review and job.resume_review.get("passed"))
         for job in material_jobs
     )
 
-    if material_jobs and not gemini_state.rate_limited:
-        print("\nDrafting application materials for the selected shortlist...")
+    model = config.get("local_model", "llama3.2:3b")
+    if material_jobs:
+        print("\nDrafting application materials with the local model...")
         status.publish(
             "application-writer", "running", discovered=len(all_jobs),
             shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
         )
-        draft_shortlist(
-            material_jobs, profile, config.get("gemini_model", "gemini-3.6-flash"), gemini_state
-        )
-    elif gemini_state.rate_limited:
-        print("\nGemini rate limit reached during resume tailoring; skipping remaining generation calls.")
+        if wait_until_ready():
+            installed = available_models()
+            if installed and not any(name.startswith(model.split(":")[0]) for name in installed):
+                print(f"  [drafter] model {model} is not installed; available: {', '.join(installed)}")
+            draft_shortlist(material_jobs, profile, model, demand)
+        else:
+            print("  [drafter] no local model server reachable; shortlist and resumes are still reported.")
     elif shortlist:
-        print("\nAI material generation is capped at zero jobs for this run; writing the full shortlist report.")
+        print("\nMaterial generation is capped at zero jobs for this run; writing the full shortlist report.")
     else:
         print("\nNo jobs cleared the match threshold this run. Try lowering min_match_score in config.json,"
               " or adding more companies to greenhouse_boards/lever_boards.")
@@ -159,8 +167,8 @@ def main():
     )
     if shortlist and drafted_count == 0 and resumes_tailored == 0:
         print(
-            "\nNo application materials were generated. Check the GEMINI_API_KEY secret "
-            "and the preceding Gemini/resume-tailor diagnostics in this run."
+            "\nNo application materials were generated. Check the local model "
+            "diagnostics above (server reachable? model pulled?)."
         )
     status.publish(
         "application-writer", "running", discovered=len(all_jobs),

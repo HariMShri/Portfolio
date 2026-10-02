@@ -3,16 +3,19 @@ each shortlisted job, using only facts present in profile.json. This is a
 draft for YOU to review and edit before submitting anywhere -- it is not
 wired up to actually submit applications.
 
-Uses the Gemini API (generativelanguage.googleapis.com) via plain REST calls
--- no SDK dependency needed beyond `requests`, which the rest of the agent
-already uses. Free tier is enough for the handful of drafts this needs per
-run. Get a key at aistudio.google.com/apikey (GEMINI_API_KEY).
+Runs against a local model (Ollama) rather than a hosted API: no key, no
+quota, no per-call cost, and the profile text never leaves the machine or
+runner. Generation on a CPU runner is slow but free, so the per-run cap is
+about wall-clock time now, not spend.
+
+This is the only step that still needs a model. Evidence selection moved to
+`local_tailor`, which is deterministic.
 """
 import json
-import os
 
-from .gemini_client import gemini_json_request
-from .models import GeminiRunState, Job
+from .local_llm import generate_json
+from .local_tailor import normalize, term_in_text
+from .models import Job
 
 PROFILE_EVIDENCE_FIELDS = (
     "years_experience",
@@ -30,7 +33,7 @@ You MUST only use facts given to you in the candidate profile -- never invent \
 employers, metrics, skills, or experience the candidate doesn't have. If the job \
 asks for something not covered by the profile, acknowledge the gap honestly rather \
 than fabricating a match. Keep the tone professional, direct, and specific to the \
-actual job description provided -- avoid generic filler."""
+actual job description provided -- avoid generic filler. Reply with JSON only."""
 
 USER_PROMPT_TEMPLATE = """CANDIDATE PROFILE:
 {profile_json}
@@ -41,7 +44,7 @@ Company: {company}
 Location: {location}
 Description:
 {description}
-
+{keyword_hint}
 Write:
 1. A short cover note (120-180 words) tailored to this specific job, grounded only \
 in the candidate's real profile above.
@@ -70,13 +73,27 @@ RESPONSE_SCHEMA = {
 }
 
 
-def draft_for_job(
-    job: Job,
-    profile: dict,
-    api_key: str,
-    model: str,
-    run_state: GeminiRunState | None = None,
-) -> Job:
+def keyword_hint(job: Job, profile: dict, demand=None) -> str:
+    """Surface the terms this listing shares with the profile, ranked by how
+    often the wider market asks for them, so the note leads with the evidence
+    an ATS screen is most likely to look for."""
+    if not demand:
+        return ""
+    job_norm = normalize(f"{job.title} {job.description}")
+    owned = [
+        skill for skill in profile.get("skills", [])
+        if term_in_text(skill, job_norm)
+    ]
+    if not owned:
+        return ""
+    owned.sort(key=lambda skill: -demand.get(normalize(skill).strip(), 0))
+    return (
+        "\nThese profile skills appear in this listing and are commonly required "
+        f"for this kind of role -- prefer them where they fit honestly: {', '.join(owned[:8])}.\n"
+    )
+
+
+def draft_for_job(job: Job, profile: dict, model: str, demand=None) -> Job:
     profile_evidence = {key: profile[key] for key in PROFILE_EVIDENCE_FIELDS if key in profile}
     prompt = USER_PROMPT_TEMPLATE.format(
         profile_json=json.dumps(profile_evidence, indent=2),
@@ -84,10 +101,9 @@ def draft_for_job(
         company=job.company,
         location=job.location,
         description=job.description[:4000] or "(no description available -- draft from title/company alone and flag that in the cover note)",
+        keyword_hint=keyword_hint(job, profile, demand),
     )
-    parsed, error = gemini_json_request(
-        prompt, SYSTEM_PROMPT, api_key, model, run_state, "drafter", RESPONSE_SCHEMA
-    )
+    parsed, error = generate_json(prompt, SYSTEM_PROMPT, model, "drafter", RESPONSE_SCHEMA)
     if error is not None:
         job.draft_cover_note = f"[Drafting failed: {error}]"
         job.draft_qa = []
@@ -97,21 +113,8 @@ def draft_for_job(
     return job
 
 
-def draft_shortlist(
-    jobs: list[Job],
-    profile: dict,
-    model: str,
-    run_state: GeminiRunState | None = None,
-) -> list[Job]:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("  [drafter] GEMINI_API_KEY not set -- skipping drafting, jobs will be listed without draft materials.")
-        return jobs
-
+def draft_shortlist(jobs: list[Job], profile: dict, model: str, demand=None) -> list[Job]:
     for i, job in enumerate(jobs):
-        if run_state is not None and run_state.rate_limited:
-            print("  [drafter] stopping remaining Gemini requests after rate limit")
-            break
         print(f"  [drafter] drafting {i + 1}/{len(jobs)}: {job.title} @ {job.company}")
-        draft_for_job(job, profile, api_key, model, run_state)
+        draft_for_job(job, profile, model, demand)
     return jobs

@@ -13,10 +13,16 @@ on:
 permissions:
   contents: read
 
+env:
+  # Keep in step with config.json -> local_model. Small enough to generate on
+  # a 4-vCPU runner without a GPU; the cache key below is derived from it.
+  LOCAL_MODEL: llama3.2:3b
+
 jobs:
   search-and-notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Generation is CPU-only, so the budget is wall clock rather than spend.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: job-agent
@@ -32,9 +38,37 @@ jobs:
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
+      # The ATS memory is the one piece of state that must survive between
+      # runs. It lives in the cache rather than the repo because the repo is
+      # public; a fresh key per run with a shared prefix means each run saves
+      # an updated copy and restores the most recent one.
+      - name: Restore ATS memory
+        uses: actions/cache@v4
+        with:
+          path: job-agent/output/ats_memory.json
+          key: ats-memory-${{ github.run_id }}
+          restore-keys: ats-memory-
+
+      - name: Cache the local model
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-${{ env.LOCAL_MODEL }}-v1
+
+      - name: Install and start the local model server
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          # No-op when the cache already provided the blobs.
+          ollama pull "$LOCAL_MODEL"
+          ollama list
+
       - name: Run job search agent
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           STATUS_API_URL: ${{ vars.STATUS_API_URL }}
           STATUS_API_TOKEN: ${{ secrets.STATUS_API_TOKEN }}

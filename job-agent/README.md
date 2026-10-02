@@ -1,7 +1,7 @@
 # Job Search Agent
 
 Searches job listings, scores them against `profile.json`, drafts tailored
-application materials for the shortlist using the Gemini API, writes a local
+application materials for the shortlist using a local model, writes a local
 PDF + HTML report, and emails you a daily digest with the PDF attached.
 **It does not submit anything anywhere** — you review each draft and apply
 manually on the original listing.
@@ -37,19 +37,18 @@ which can hurt more than help. So this agent:
 
 ## Running it automatically (GitHub Actions)
 
-The scheduled workflow needs two repo secrets. Go to
+The scheduled workflow needs one repo secret. Go to
 **github.com/HariMShri/Portfolio → Settings → Secrets and variables →
-Actions → New repository secret** and add both (never paste API keys into a
-chat or commit them to the repo):
+Actions → New repository secret** (never paste API keys into a chat or
+commit them to the repo):
 
-- `GEMINI_API_KEY` — from aistudio.google.com/apikey (free tier; see Cost below)
 - `RESEND_API_KEY` — from resend.com (free tier is plenty for one email/day).
   Sign up, verify your account, create an API key. No domain verification
   needed — this uses Resend's shared `onboarding@resend.dev` sending address
   by default (see `config.json` → `notify.from_email` if you later verify
   your own domain and want a nicer from-address).
 
-Once both secrets are set, the workflow runs on its own daily (03:00 UTC /
+Once that secret is set, the workflow runs on its own daily (03:00 UTC /
 08:30 IST — GitHub schedule triggers aren't exact-to-the-minute). To test it
 immediately instead of waiting: **Actions tab → Daily Job Search Digest → Run
 workflow**.
@@ -98,8 +97,10 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Copy `.env.example` to `.env` and add your own `GEMINI_API_KEY` and
-`RESEND_API_KEY` (aistudio.google.com/apikey / resend.com). Never commit
+Copy `.env.example` to `.env` and add your own `RESEND_API_KEY`
+(resend.com). For cover notes locally, install Ollama and run
+`ollama pull llama3.2:3b`; without it the run still produces the shortlist
+and tailored resumes. Never commit
 `.env` — it's already in `.gitignore`. Keep the tracked `.env.example` as
 placeholders only. If a real key was put in that example file, revoke it and
 create a replacement before using the agent.
@@ -160,25 +161,47 @@ description text you paste in, the better both the match score and the
 drafted cover note will be). These flow through the same scoring + drafting
 pipeline as everything else.
 
-## Cost
+## Cost and the local model
 
-Each run calls Gemini at most twice for each of the top two shortlisted jobs
-by default: once for resume evidence selection and once for application
-materials. The full shortlist is still reported; change
-`config.json` → `max_ai_jobs_per_run` to adjust the number receiving AI
-materials.
+Nothing here calls a paid API. Evidence selection is deterministic Python,
+and the cover note runs on a small local model (Ollama, `llama3.2:3b` by
+default -- see `config.json` -> `local_model`) inside the GitHub Actions
+runner. There is no API key to manage and no quota to exhaust; your profile
+and the job descriptions never leave the runner.
 
-The cap is 2 rather than 4 because of measured free-tier behaviour, not
-caution: a run on 2026-10-02 with the cap at 4 got through 6 calls before
-Gemini returned HTTP 429, and a 13-second wait was not enough to clear it.
-At 4 jobs that produced 4 tailored resumes but only 1 cover note; at 2 jobs
-the run fits inside the quota and both jobs get a complete package. A
-rate-limit response stops further Gemini requests in that run. Gemini uses
-`gemini-3.6-flash` by default (see `config.json` → `gemini_model`); check
-current limits at ai.google.dev/gemini-api/docs/pricing before raising the
-per-run cap.
+The cost moved from money to wall-clock time: generation is CPU-only, so
+each cover note takes roughly a minute. `max_ai_jobs_per_run` (default 3)
+is what bounds the run, and the workflow allows 45 minutes. The model is
+cached between runs, so only the first run after a model change pays the
+download.
+
+Why local rather than a hosted API: evidence selection never needed a model
+at all -- it returns indexes into `profile.json`, and anything outside the
+profile is rejected -- so half the calls were spent asking a hosted model to
+do keyword matching. Only the cover note genuinely needs generation, and a
+small local model is adequate for a draft that you edit before sending.
+
+### If generation is unavailable
+
+If the model server does not come up, the run still completes: you get the
+scored shortlist, tailored resumes and the digest, with the cover note
+marked as failed. Search never depends on the model.
+
+### ATS memory
+
+Every run folds the listings it fetched into `output/ats_memory.json`:
+per-term counts of what employers asked for, across all listings and across
+the ones that cleared the match bar. Resume Tailor orders skills by that
+demand, and the gap list shows terms the market keeps asking for that are
+absent from `profile.json`. Only aggregate counts are stored -- never a
+title, company, URL or description. In CI it lives in the Actions cache, so
+it accumulates across runs without ever entering this public repo.
 
 Originally built against the Anthropic API, then switched to Gemini to avoid
-needing a paid key. Also considered GitHub Models (would have meant zero new
-secrets at all, reusing the workflow's built-in `GITHUB_TOKEN`) but that
-service was fully retired on July 30, 2026, so it's not an option.
+needing a paid key, and finally moved off hosted APIs altogether. The free
+tier turned out to be the binding constraint: a run capped at 4 jobs made 8
+calls and hit HTTP 429 partway through, so most days produced partial
+materials. Also considered GitHub Models (would have meant zero new secrets
+at all, reusing the workflow's built-in `GITHUB_TOKEN`) but that service was
+fully retired on July 30, 2026. Running locally removed the quota, the key
+and the per-call cost in one step, at the price of slower generation.
