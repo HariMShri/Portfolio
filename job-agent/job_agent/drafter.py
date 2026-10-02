@@ -53,6 +53,22 @@ Respond as JSON with this exact shape:
 {{"cover_note": "...", "qa": [{{"question": "...", "answer": "..."}}, ...]}}
 Respond with ONLY the JSON, no other text."""
 
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "cover_note": {"type": "string"},
+        "qa": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"question": {"type": "string"}, "answer": {"type": "string"}},
+                "required": ["question", "answer"],
+            },
+        },
+    },
+    "required": ["cover_note", "qa"],
+}
+
 
 def draft_for_job(
     job: Job,
@@ -69,7 +85,9 @@ def draft_for_job(
         location=job.location,
         description=job.description[:4000] or "(no description available -- draft from title/company alone and flag that in the cover note)",
     )
-    parsed, error = gemini_json_request(prompt, SYSTEM_PROMPT, api_key, model, run_state, "drafter")
+    parsed, error = gemini_json_request(
+        prompt, SYSTEM_PROMPT, api_key, model, run_state, "drafter", RESPONSE_SCHEMA
+    )
     if error is not None:
         job.draft_cover_note = f"[Drafting failed: {error}]"
         job.draft_qa = []
