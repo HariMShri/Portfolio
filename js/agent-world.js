@@ -45,7 +45,7 @@ if (!canvas || !sceneRoot) throw new Error('Agent network scene elements are mis
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xe3ebe5);
+scene.background = new THREE.Color(0x0b0e13);
 
 const camera = new THREE.OrthographicCamera(-8, 8, 5.5, -5.5, 0.1, 110);
 camera.position.set(0, 11.6, 14.5);

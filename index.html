@@ -7,7 +7,7 @@
 <meta name="description" content="Portfolio of Shri Hari M — Senior Test Engineer with 5+ years in manual testing, API testing, database validation, and QA automation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -52,10 +52,13 @@
 
   <!-- ===== HERO ===== -->
   <section class="hero" id="home">
-    <div class="hero__bg" aria-hidden="true"></div>
+    <div class="hero__bg" aria-hidden="true">
+      <canvas id="heroCanvas"></canvas>
+      <div class="hero__scrim"></div>
+    </div>
     <div class="container hero__inner">
       <div class="hero__text" data-reveal>
-        <p class="hero__eyebrow">Hello, I'm</p>
+        <p class="hero__eyebrow">Quality engineering &middot; Test automation</p>
         <h1 class="hero__name">Shri Hari M</h1>
         <h2 class="hero__role">
           <span id="typedRole">Manual Test Engineer</span><span class="cursor">|</span>
@@ -698,6 +701,7 @@
 </div>
 
 <script src="js/script.js"></script>
+<script type="module" src="js/hero.js"></script>
 <script type="module" src="js/agent-world.js"></script>
 </body>
 </html>

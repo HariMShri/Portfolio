@@ -214,10 +214,12 @@ function applyTheme(theme) {
   }
 }
 
-let savedTheme = 'light';
+// The site is designed dark -- the hero is a lit haze field and every surface
+// is built on top of it -- so dark is the default and light is opt-in, rather
+// than letting an OS preference decide which design a visitor sees.
+let savedTheme = 'dark';
 try {
-  savedTheme = localStorage.getItem('portfolio-theme') ||
-    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  savedTheme = localStorage.getItem('portfolio-theme') || 'dark';
 } catch (e) { /* ignore */ }
 applyTheme(savedTheme);
 
