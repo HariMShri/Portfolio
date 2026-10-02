@@ -40,6 +40,7 @@ class StatusPublisher:
         resumes_tailored: int = 0,
         awaiting_review: int = 0,
         phase_complete: bool = False,
+        feedback_analyst_status: str | None = None,
     ) -> None:
         if not self.url or not self.token:
             return
@@ -47,6 +48,12 @@ class StatusPublisher:
         phase_index = ACTIVE_PHASES.index(phase) if phase in ACTIVE_PHASES else -1
         agents = []
         for agent_id in AGENT_IDS:
+            if agent_id == "feedback-analyst":
+                # Runs once per full search run (after the coordinator), not
+                # as a sequential pipeline stage, and is gated on recorded
+                # outcome data existing at all -- see feedback_analyst.py.
+                agents.append({"id": agent_id, "status": feedback_analyst_status or "planned"})
+                continue
             if agent_id in ACTIVE_PHASES:
                 agent_index = ACTIVE_PHASES.index(agent_id)
                 if agent_index < phase_index or run_status == "completed":

@@ -10,9 +10,10 @@ run. Get a key at aistudio.google.com/apikey (GEMINI_API_KEY).
 """
 import json
 import os
+
+from .gemini_client import gemini_json_request
 from .models import GeminiRunState, Job
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 PROFILE_EVIDENCE_FIELDS = (
     "years_experience",
     "current_title",
@@ -60,8 +61,6 @@ def draft_for_job(
     model: str,
     run_state: GeminiRunState | None = None,
 ) -> Job:
-    import requests
-
     profile_evidence = {key: profile[key] for key in PROFILE_EVIDENCE_FIELDS if key in profile}
     prompt = USER_PROMPT_TEMPLATE.format(
         profile_json=json.dumps(profile_evidence, indent=2),
@@ -70,42 +69,13 @@ def draft_for_job(
         location=job.location,
         description=job.description[:4000] or "(no description available -- draft from title/company alone and flag that in the cover note)",
     )
-    try:
-        resp = requests.post(
-            API_URL,
-            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "system_instruction": SYSTEM_PROMPT,
-                "input": prompt,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        text = data.get("output_text", "").strip()
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.startswith("json"):
-                text = text[4:]
-        parsed = json.loads(text)
-        job.draft_cover_note = parsed.get("cover_note")
-        job.draft_qa = parsed.get("qa", [])
-    except requests.HTTPError as exc:
-        status = exc.response.status_code if exc.response is not None else "unknown"
-        print(f"  [drafter] Gemini request failed (HTTP {status})")
-        if status == 429 and run_state is not None:
-            run_state.rate_limited = True
-        job.draft_cover_note = f"[Drafting failed: Gemini returned HTTP {status}]"
+    parsed, error = gemini_json_request(prompt, SYSTEM_PROMPT, api_key, model, run_state, "drafter")
+    if error is not None:
+        job.draft_cover_note = f"[Drafting failed: {error}]"
         job.draft_qa = []
-    except json.JSONDecodeError:
-        print("  [drafter] Gemini returned a response that was not valid JSON")
-        job.draft_cover_note = "[Drafting failed: Gemini returned invalid JSON]"
-        job.draft_qa = []
-    except Exception as exc:
-        print(f"  [drafter] generation failed ({type(exc).__name__})")
-        job.draft_cover_note = f"[Drafting failed for this job: {exc}]"
-        job.draft_qa = []
+        return job
+    job.draft_cover_note = parsed.get("cover_note")
+    job.draft_qa = parsed.get("qa", [])
     return job
 
 

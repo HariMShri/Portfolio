@@ -21,6 +21,7 @@ from job_agent.report import write_report
 from job_agent.notifier import send_digest
 from job_agent.resume_tailor import tailor_shortlist
 from job_agent.reviewer import review_resume_drafts
+from job_agent.feedback_analyst import run_feedback_analysis
 from job_agent.status import StatusPublisher
 from job_agent.sources import greenhouse, lever, indeed, linkedin, naukri, manual
 
@@ -169,6 +170,17 @@ def main():
     )
     print(f"\nReport written to:\n  {html_path}\n  {pdf_path}\n  {json_path}")
 
+    # Best-effort and independent of digest success: analyzes whatever
+    # outcomes the user has recorded with record_outcome.py since the last
+    # run. Never raises -- a missed insight should never fail a job search.
+    print("\nChecking for recorded outcomes (Feedback Analyst)...")
+    feedback_result, _ = run_feedback_analysis("output", config)
+    feedback_status = {
+        "insufficient_data": "idle",
+        "ok": "completed",
+        "error": "failed",
+    }.get(feedback_result.get("status"), "idle")
+
     print("\nSending daily digest...")
     try:
         digest_sent = send_digest(shortlist, profile, config, pdf_path)
@@ -177,7 +189,7 @@ def main():
             "application-coordinator", "failed", discovered=len(all_jobs),
             shortlisted=len(shortlist), drafted=drafted_count,
             resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
-            phase_complete=True,
+            phase_complete=True, feedback_analyst_status=feedback_status,
         )
         raise
 
@@ -191,7 +203,7 @@ def main():
             "application-coordinator", "failed", discovered=len(all_jobs),
             shortlisted=len(shortlist), drafted=drafted_count,
             resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
-            phase_complete=True,
+            phase_complete=True, feedback_analyst_status=feedback_status,
         )
         return
     if not notifications_enabled:
@@ -203,6 +215,7 @@ def main():
         shortlisted=len(shortlist), drafted=drafted_count,
         resumes_tailored=resumes_tailored,
         awaiting_review=drafted_count, phase_complete=True,
+        feedback_analyst_status=feedback_status,
     )
 
 

@@ -12,6 +12,7 @@ from job_agent.resume_tailor import tailor_resume_for_job, tailor_shortlist, val
 from job_agent.models import GeminiRunState, Job
 from job_agent.report import render_resume_html, write_report
 from job_agent.drafter import draft_for_job, draft_shortlist
+from job_agent.gemini_client import gemini_json_request
 
 
 class StatusPublisherTests(unittest.TestCase):
@@ -109,7 +110,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         })}
         job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
 
-        with patch("job_agent.resume_tailor.requests.post", return_value=response) as post:
+        with patch("job_agent.gemini_client.requests.post", return_value=response) as post:
             tailor_resume_for_job(job, profile, "test-key", "test-model")
 
         self.assertTrue(job.resume_review["passed"])
@@ -135,7 +136,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         })}
         job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
 
-        with patch("requests.post", return_value=response) as post:
+        with patch("job_agent.gemini_client.requests.post", return_value=response) as post:
             draft_for_job(job, profile, "test-key", "test-model")
 
         prompt = post.call_args.kwargs["json"]["input"]
@@ -154,7 +155,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         )
         job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
 
-        with patch("requests.post", return_value=response), patch("builtins.print") as print_mock:
+        with patch("job_agent.gemini_client.requests.post", return_value=response), patch("builtins.print") as print_mock:
             draft_for_job(job, profile, "test-secret", "test-model")
 
         logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
@@ -169,7 +170,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         )
         job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
 
-        with patch("job_agent.resume_tailor.requests.post", return_value=response), patch("builtins.print") as print_mock:
+        with patch("job_agent.gemini_client.requests.post", return_value=response), patch("builtins.print") as print_mock:
             tailor_resume_for_job(job, self.profile, "test-secret", "test-model")
 
         logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
@@ -190,7 +191,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         run_state = GeminiRunState()
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
-                patch("job_agent.resume_tailor.requests.post", return_value=response) as post, \
+                patch("job_agent.gemini_client.requests.post", return_value=response) as post, \
                 patch("builtins.print"):
             tailor_shortlist(jobs, self.profile, "test-model", run_state)
 
@@ -209,7 +210,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         run_state = GeminiRunState()
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
-                patch("requests.post", return_value=response) as post, \
+                patch("job_agent.gemini_client.requests.post", return_value=response) as post, \
                 patch("builtins.print"):
             draft_shortlist(jobs, self.profile, "test-model", run_state)
 
@@ -221,7 +222,7 @@ class ResumePlanValidationTests(unittest.TestCase):
         response.json.return_value = {"output_text": "not a JSON document"}
         job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
 
-        with patch("job_agent.resume_tailor.requests.post", return_value=response), patch("builtins.print") as print_mock:
+        with patch("job_agent.gemini_client.requests.post", return_value=response), patch("builtins.print") as print_mock:
             tailor_resume_for_job(job, self.profile, "test-secret", "test-model")
 
         logged_text = " ".join(str(call.args[0]) for call in print_mock.call_args_list)
@@ -308,6 +309,75 @@ class ResumePlanValidationTests(unittest.TestCase):
         self.assertEqual(agents["application-writer"], "failed")
         self.assertEqual(agents["application-reviewer"], "failed")
         self.assertEqual(agents["application-coordinator"], "completed")
+
+
+class GeminiClientRetryTests(unittest.TestCase):
+    """The CI run of 2026-10-02 lost every draft to a mix of transient 503s,
+    malformed JSON, and a 429 that killed the whole run -- these pin down
+    the bounded retry/backoff behavior added to fix that."""
+
+    def test_transient_server_error_retries_then_succeeds(self):
+        failure = Mock()
+        failure.raise_for_status.side_effect = requests.HTTPError(
+            "unavailable", response=Mock(status_code=503)
+        )
+        success = Mock()
+        success.json.return_value = {"output_text": json.dumps({"ok": True})}
+
+        with patch("job_agent.gemini_client.requests.post", side_effect=[failure, success]) as post, \
+                patch("job_agent.gemini_client.time.sleep") as sleep_mock, \
+                patch("builtins.print"):
+            parsed, error = gemini_json_request("prompt", "system", "key", "model", None, "test")
+
+        self.assertIsNone(error)
+        self.assertEqual(parsed, {"ok": True})
+        self.assertEqual(post.call_count, 2)
+        sleep_mock.assert_called_once()
+
+    def test_transient_server_error_gives_up_after_bounded_retries(self):
+        failure = Mock()
+        failure.raise_for_status.side_effect = requests.HTTPError(
+            "unavailable", response=Mock(status_code=503)
+        )
+
+        with patch("job_agent.gemini_client.requests.post", return_value=failure) as post, \
+                patch("job_agent.gemini_client.time.sleep"), \
+                patch("builtins.print"):
+            parsed, error = gemini_json_request("prompt", "system", "key", "model", None, "test")
+
+        self.assertIsNone(parsed)
+        self.assertIn("HTTP 503", error)
+        # 1 initial attempt + MAX_TRANSIENT_RETRIES retries, never unbounded.
+        self.assertEqual(post.call_count, 3)
+
+    def test_malformed_json_retries_once_then_succeeds(self):
+        bad = Mock()
+        bad.json.return_value = {"output_text": "not json"}
+        good = Mock()
+        good.json.return_value = {"output_text": json.dumps({"ok": True})}
+
+        with patch("job_agent.gemini_client.requests.post", side_effect=[bad, good]) as post, \
+                patch("builtins.print"):
+            parsed, error = gemini_json_request("prompt", "system", "key", "model", None, "test")
+
+        self.assertIsNone(error)
+        self.assertEqual(parsed, {"ok": True})
+        self.assertEqual(post.call_count, 2)
+
+    def test_rate_limit_pauses_run_without_burning_every_remaining_call(self):
+        limited = Mock()
+        limited.raise_for_status.side_effect = requests.HTTPError(
+            "quota", response=Mock(status_code=429)
+        )
+        run_state = GeminiRunState()
+
+        with patch("job_agent.gemini_client.requests.post", return_value=limited) as post, \
+                patch("builtins.print"):
+            parsed, error = gemini_json_request("prompt", "system", "key", "model", run_state, "test")
+
+        self.assertIsNone(parsed)
+        self.assertTrue(run_state.rate_limited)
+        self.assertEqual(post.call_count, 1)
 
 
 if __name__ == "__main__":

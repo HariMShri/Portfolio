@@ -128,6 +128,30 @@ drafts are built by selecting and ordering exact highlights and skills from
 `profile.json`; the source PDF is left unchanged. All output is gitignored and
 never committed.
 
+## Recording outcomes (Feedback Analyst)
+
+The agent never submits anything, so it has no way to know on its own
+whether a shortlisted job led anywhere. After you apply, hear back, or get
+an interview/offer, tell it:
+
+```
+python record_outcome.py --job-id <id> --decision interview
+```
+
+`--job-id` is in each job's entry in the latest `output/report_<timestamp>.json`
+(a stable id derived from company+title, not tied to a single run). Valid
+`--decision` values: `applied`, `skipped`, `interview`, `rejected`, `offer`,
+`no_response`. This appends one line to the gitignored `output/outcomes.jsonl`
+— local-only, never committed, never sent anywhere.
+
+Once 5+ outcomes are resolved (interview/offer/rejected/no_response), the
+next run's Feedback Analyst step looks for a source or match-score band that's
+clearly underperforming and writes a dated, advisory
+`output/feedback_proposal_<timestamp>.json` — it never edits `config.json` or
+`profile.json` itself; you review and apply any change by hand. Below that
+threshold it says `insufficient_data` rather than guessing from too little
+signal. See [`WORKFLOW.md`](WORKFLOW.md) for the full contract.
+
 ## Adding jobs manually (e.g. from Naukri)
 
 Copy `manual_jobs.example.json` to `manual_jobs.json` and add entries — title,
