@@ -70,11 +70,42 @@ test("stores and exposes only the allowlisted aggregate fields", async () => {
   const readResponse = await worker.fetch(new Request("https://worker.test/status"), env);
   assert.equal(readResponse.status, 200);
   const status = await readResponse.json();
-  assert.deepEqual(Object.keys(status).sort(), ["agents", "counts", "run_status", "schema_version", "updated_at"]);
+  assert.deepEqual(
+    Object.keys(status).sort(),
+    ["agents", "counts", "run_status", "runtime", "schema_version", "updated_at"],
+  );
   assert.equal(status.counts.discovered, 4);
   assert.equal("job_description" in status, false);
   assert.equal("resume" in status, false);
   assert.equal("arbitrary" in status, false);
+});
+
+test("accepts and exposes the local model runtime state", async () => {
+  const env = makeEnv();
+  const payload = { ...makePayload(), runtime: { model: "llama3.2:3b", status: "running" } };
+  assert.equal((await worker.fetch(updateRequest(payload), env)).status, 200);
+
+  const status = await (await worker.fetch(new Request("https://worker.test/status"), env)).json();
+  assert.deepEqual(status.runtime, { model: "llama3.2:3b", status: "running" });
+});
+
+test("defaults the runtime state when a runner does not report one", async () => {
+  const env = makeEnv();
+  assert.equal((await worker.fetch(updateRequest(makePayload()), env)).status, 200);
+
+  const status = await (await worker.fetch(new Request("https://worker.test/status"), env)).json();
+  assert.deepEqual(status.runtime, { model: "", status: "idle" });
+});
+
+test("rejects an invalid or oversized runtime block", async () => {
+  const env = makeEnv();
+  const badStatus = { ...makePayload(), runtime: { model: "llama3.2:3b", status: "melting" } };
+  const badName = { ...makePayload(), runtime: { model: "x".repeat(65), status: "idle" } };
+  const injected = { ...makePayload(), runtime: { model: "<script>alert(1)</script>", status: "idle" } };
+
+  assert.equal((await worker.fetch(updateRequest(badStatus), env)).status, 400);
+  assert.equal((await worker.fetch(updateRequest(badName), env)).status, 400);
+  assert.equal((await worker.fetch(updateRequest(injected), env)).status, 400);
 });
 
 test("reports unavailable when no status store is configured", async () => {

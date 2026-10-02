@@ -41,6 +41,8 @@ class StatusPublisher:
         awaiting_review: int = 0,
         phase_complete: bool = False,
         feedback_analyst_status: str | None = None,
+        model_status: str = "idle",
+        model_name: str = "",
     ) -> None:
         if not self.url or not self.token:
             return
@@ -93,6 +95,10 @@ class StatusPublisher:
                 "skipped": 0,
             },
             "agents": agents,
+            # The model is infrastructure the Application Writer uses, not a
+            # workflow role, so it is reported separately from `agents`. The
+            # name is a public model identifier, never a credential.
+            "runtime": {"model": model_name, "status": model_status},
         }
         try:
             response = requests.post(

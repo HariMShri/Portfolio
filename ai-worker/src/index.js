@@ -40,6 +40,11 @@ const STATUS_VALUES = new Set(["planned", "idle", "running", "completed", "faile
 const RUN_STATUS_VALUES = new Set(["idle", "running", "completed", "failed"]);
 const COUNT_KEYS = ["discovered", "shortlisted", "drafted", "resumes_tailored", "awaiting_review", "applied", "skipped"];
 const MAX_STATUS_BODY_LENGTH = 8192;
+// The local model is infrastructure the Application Writer uses, not a
+// workflow role, so it is reported outside `agents`. Optional, so a runner
+// that predates it still publishes a valid payload.
+const MAX_MODEL_NAME_LENGTH = 64;
+const MODEL_NAME_PATTERN = /^[a-z0-9][a-z0-9._:-]*$/i;
 
 const SYSTEM_PROMPT = `You are answering questions AS Shri Hari M, a Senior Test Engineer, on his \
 personal portfolio website's chat widget. Speak in the first person ("I", "my"), as him.
@@ -108,6 +113,14 @@ function validStatusPayload(body) {
     }
     seen.add(agent.id);
   }
+  if (body.runtime !== undefined) {
+    const runtime = body.runtime;
+    if (!runtime || typeof runtime !== "object") return false;
+    if (!STATUS_VALUES.has(runtime.status)) return false;
+    const name = runtime.model ?? "";
+    if (typeof name !== "string" || name.length > MAX_MODEL_NAME_LENGTH) return false;
+    if (name && !MODEL_NAME_PATTERN.test(name)) return false;
+  }
   return STATUS_AGENT_IDS.every((id) => seen.has(id));
 }
 
@@ -167,6 +180,9 @@ async function handleStatusUpdate(request, env) {
       id,
       status: body.agents.find((agent) => agent.id === id).status,
     })),
+    runtime: body.runtime
+      ? { model: String(body.runtime.model ?? ""), status: body.runtime.status }
+      : { model: "", status: "idle" },
   };
   try {
     await env.JOB_STATUS.put("latest", JSON.stringify(safeStatus), { expirationTtl: 604800 });

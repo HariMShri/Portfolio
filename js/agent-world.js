@@ -688,7 +688,19 @@ function buildKitchenette(parent, x, z, angle) {
   return group;
 }
 
-function buildServerRack(parent, x, z, angle) {
+const serverSignTexture = drawTexture(256, (ctx, size) => {
+  ctx.fillStyle = '#20282e';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#7fd4b4';
+  ctx.fillRect(16, 96, 224, 4);
+  ctx.fillStyle = '#e8eeea';
+  ctx.font = 'bold 34px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('MODEL', size / 2, 84);
+  ctx.fillText('RUNTIME', size / 2, 146);
+});
+
+function buildServerRack(parent, x, z, angle, leds) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.rotation.y = angle;
@@ -696,10 +708,59 @@ function buildServerRack(parent, x, z, angle) {
   mesh(box(0.72, 1.7, 0.66), material(0x33383d, { roughness: 0.6, metalness: 0.2 }), group, [0, 0.85, 0]);
   for (let i = 0; i < 7; i += 1) {
     mesh(box(0.62, 0.14, 0.02), material(0x1f2428, { roughness: 0.7 }), group, [0, 0.3 + i * 0.2, 0.34], { cast: false });
-    mesh(box(0.05, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: i % 3 ? 0x7fd4b4 : 0xe0ad55 }), group,
-      [0.22, 0.3 + i * 0.2, 0.36], { cast: false, receive: false });
+    const led = mesh(
+      box(0.05, 0.03, 0.02),
+      new THREE.MeshBasicMaterial({ color: 0x7fd4b4 }),
+      group,
+      [0.22, 0.3 + i * 0.2, 0.36],
+      { cast: false, receive: false },
+    );
+    leds.push(led);
   }
   return group;
+}
+
+// The local model is the one piece of infrastructure the agents depend on, so
+// it gets a room rather than a desk: a glazed bay the Application Writer sends
+// work to, lit by whatever the status feed reports.
+function buildServerRoom(parent, x, z, angle) {
+  const room = new THREE.Group();
+  room.position.set(x, 0, z);
+  room.rotation.y = angle;
+  parent.add(room);
+
+  const leds = [];
+  mesh(plane(3.6, 2.8), material(0x97a3a4, { roughness: 0.84 }), room, [0, 0.008, 0],
+    { rotation: [-Math.PI / 2, 0, 0], cast: false });
+  for (let i = -3; i <= 3; i += 1) {
+    mesh(box(0.02, 0.004, 2.8), material(0x7f8b8d, { roughness: 0.8 }), room, [i * 0.5, 0.012, 0], { cast: false });
+  }
+
+  const frame = material(0x9aa5a2, { roughness: 0.4, metalness: 0.45 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xcfe4ea, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.22,
+  });
+  // Two sides only, so the bay stays readable from the camera.
+  for (const [px, pz, rot, width] of [[0, 1.4, 0, 3.6], [-1.8, 0, Math.PI / 2, 2.8]]) {
+    const pane = mesh(plane(width, 2.0), glass, room, [px, 1.0, pz], { rotation: [0, rot, 0], cast: false, receive: false });
+    pane.renderOrder = 2;
+    mesh(box(width, 0.06, 0.06), frame, room, [px, 2.0, pz], { rotation: [0, rot, 0], cast: false });
+    mesh(box(0.06, 2.0, 0.06), frame, room, [
+      px + Math.cos(rot) * (width / 2), 1.0, pz - Math.sin(rot) * (width / 2),
+    ], { cast: false });
+  }
+
+  buildServerRack(room, -0.95, -0.35, 0, leds);
+  buildServerRack(room, -0.05, -0.35, 0, leds);
+  buildServerRack(room, 0.85, -0.35, 0, leds);
+
+  const sign = mesh(plane(0.72, 0.72), new THREE.MeshBasicMaterial({ map: serverSignTexture }), room,
+    [1.55, 1.25, 0.5], { rotation: [0, -0.55, 0], cast: false, receive: false });
+  sign.renderOrder = 3;
+
+  mesh(box(0.46, 0.42, 0.38), material(0x4a5257, { roughness: 0.6 }), room, [1.3, 0.21, -0.4]);
+
+  return { group: room, leds, anchor: new THREE.Vector3(x, 0.5, z) };
 }
 
 function buildPrinter(parent, x, z) {
@@ -1068,6 +1129,8 @@ function buildProps(mobile) {
     buildKitchenette(propRoot, 0, -6.6, 0);
     buildWaterCooler(propRoot, 3.2, -6.2);
     buildPlant(propRoot, -3.3, -6.2, 0.95);
+    serverRoom = buildServerRoom(propRoot, 2.1, -4.3, -Math.PI / 2);
+    serverRoom.group.scale.setScalar(0.72);
     return;
   }
 
@@ -1083,15 +1146,18 @@ function buildProps(mobile) {
   buildWaterCooler(propRoot, 8.4, 0.5);
   buildPlant(propRoot, 8.6, 5.4, 1.05);
 
-  buildRug(propRoot, 7.0, -4.2, 4.2, 3.8, 0x8d9a93);
-  buildMeetingPod(propRoot, 7.0, -4.2);
-  buildServerRack(propRoot, 8.8, -5.4, -Math.PI / 2);
-  buildPrinter(propRoot, -8.4, -5.1);
-  buildPlant(propRoot, -6.6, -5.7, 1.2);
+  serverRoom = buildServerRoom(propRoot, 7.1, -3.9, 0);
+  buildRug(propRoot, -7.6, -4.5, 4.0, 3.6, 0x8d9a93);
+  buildMeetingPod(propRoot, -7.6, -4.5);
+  buildPrinter(propRoot, -9.4, -1.4);
+  buildPlant(propRoot, -5.6, -6.2, 1.2);
 }
 
 /* ---------- scene assembly ---------- */
 
+let serverRoom = null;
+let modelLink = null;
+let modelRuntime = { status: 'unknown', model: '' };
 let mobileLayout = window.matchMedia('(max-width: 680px)').matches;
 let stationLayouts = getPositions(mobileLayout);
 const stationGroups = new Map();
@@ -1183,6 +1249,25 @@ function createLinks() {
     packetMeshes.push({ packet, curve, agentId: AGENTS[index].id, phase: index / AGENTS.length });
     stationLinks.push({ line, agentId: AGENTS[index].id });
   }
+
+  if (serverRoom) {
+    const writerIndex = AGENTS.findIndex((agent) => agent.id === 'application-writer');
+    const writer = stationNodes[writerIndex];
+    const target = serverRoom.group.position;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(writer.position.x, 0.05, writer.position.z),
+      new THREE.Vector3((writer.position.x + target.x) / 2, 0.05, (writer.position.z + target.z) / 2 - 0.6),
+      new THREE.Vector3(target.x, 0.05, target.z + 1.6),
+    ]);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(36)), linkMaterial.clone());
+    line.material.transparent = true;
+    line.material.opacity = 0.3;
+    linkRoot.add(line);
+    const packet = mesh(sphere(0.062, 8, 6), new THREE.MeshStandardMaterial({
+      color: 0x7fd4b4, emissive: 0x7fd4b4, emissiveIntensity: 0.8, roughness: 0.4,
+    }), linkRoot, [0, 0.12, 0], { cast: false, receive: false });
+    modelLink = { line, packet, curve };
+  }
 }
 createLinks();
 
@@ -1262,6 +1347,10 @@ window.addEventListener('agent-status-update', (event) => {
   for (const state of states) {
     if (statusById.has(state.id)) statusById.set(state.id, state.status);
   }
+  const runtime = event.detail?.runtime;
+  modelRuntime = event.detail?.unavailable || !runtime
+    ? { status: 'unknown', model: '' }
+    : { status: runtime.status || 'unknown', model: runtime.model || '' };
   if (reducedMotion.matches && workflowMode === 'active') {
     agentMotion.forEach((motion, id) => {
       const rig = personRigs.get(id);
@@ -1394,6 +1483,43 @@ function updateAgentMotion(delta) {
   }
 }
 
+const MODEL_LIGHT = {
+  running: 0x7fd4b4,
+  completed: 0x6fae8e,
+  idle: 0x55707a,
+  failed: 0xd4705f,
+  unknown: 0x4e5a61,
+};
+
+function updateServerRoom() {
+  if (modelLink) {
+    const busy = modelRuntime.status === 'running';
+    modelLink.line.material.opacity = busy ? 0.72 : 0.18;
+    modelLink.line.material.color.setHex(busy ? 0x3d8a74 : 0x8aa093);
+    modelLink.packet.visible = busy && !reducedMotion.matches;
+    if (modelLink.packet.visible) {
+      modelLink.packet.position.copy(modelLink.curve.getPointAt((sceneTime * 0.33) % 1));
+      modelLink.packet.position.y += 0.07;
+    }
+  }
+  if (!serverRoom) return;
+  const colour = MODEL_LIGHT[modelRuntime.status] || MODEL_LIGHT.unknown;
+  const busy = modelRuntime.status === 'running';
+  serverRoom.leds.forEach((led, index) => {
+    led.material.color.setHex(colour);
+    // Only animate while the model is actually generating; otherwise the
+    // lights sit steady so the scene does not imply activity that isn't there.
+    if (busy && !reducedMotion.matches) {
+      const pulse = 0.55 + 0.45 * Math.sin(sceneTime * 5 + index * 0.9);
+      led.scale.setScalar(0.85 + pulse * 0.5);
+      led.visible = pulse > 0.25;
+    } else {
+      led.scale.setScalar(1);
+      led.visible = modelRuntime.status !== 'unknown';
+    }
+  });
+}
+
 function updateWallVisibility() {
   const angle = world.rotation.y;
   const cos = Math.cos(angle);
@@ -1444,6 +1570,7 @@ function renderFrame(delta) {
     line.material.opacity = state === 'running' ? 0.72 : agentId === selectedId ? 0.5 : 0.22;
     line.material.color.setHex(state === 'running' ? 0x3d8a74 : state === 'completed' ? 0x74977c : 0x8aa093);
   }
+  updateServerRoom();
   updateWallVisibility();
   renderer.render(scene, camera);
 }

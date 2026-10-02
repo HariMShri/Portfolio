@@ -56,9 +56,16 @@ jobs:
           key: ollama-${{ env.LOCAL_MODEL }}-v1
 
       - name: Install and start the local model server
+        env:
+          # The installer registers a systemd service running as the `ollama`
+          # user, which stores models under /usr/share/ollama and so misses the
+          # cache path above. Run our own server against a known directory.
+          OLLAMA_MODELS: /home/runner/.ollama/models
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
-          ollama serve &
+          sudo systemctl stop ollama 2>/dev/null || true
+          mkdir -p "$OLLAMA_MODELS"
+          ollama serve > /tmp/ollama-server.log 2>&1 &
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
             sleep 2
@@ -66,6 +73,7 @@ jobs:
           # No-op when the cache already provided the blobs.
           ollama pull "$LOCAL_MODEL"
           ollama list
+          du -sh "$OLLAMA_MODELS" || true
 
       - name: Run job search agent
         env:

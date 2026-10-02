@@ -142,7 +142,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
       const selectedCard = document.querySelector('.agent-figure[aria-pressed="true"]');
       if (selectedCard) selectAgentCard(selectedCard.dataset.agent, false);
       window.dispatchEvent(new CustomEvent('agent-status-update', {
-        detail: { agents: data.agents, run_status: data.run_status },
+        detail: { agents: data.agents, run_status: data.run_status, runtime: data.runtime },
       }));
       const noMaterials = data.run_status === 'completed'
         && data.counts.shortlisted > 0
@@ -152,7 +152,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
         liveEl.classList.remove('is-live');
         liveEl.classList.add('is-unavailable');
         statusEl.textContent = 'Search finished · no drafts generated';
-        updatedEl.textContent = `Found ${data.counts.shortlisted} shortlisted roles, but no cover-note drafts or tailored resumes were reported. Check the latest Daily Job Search Digest logs and confirm the GitHub Actions GEMINI_API_KEY secret. Email delivery separately requires RESEND_API_KEY. Job details remain private; this panel shows aggregate counts only.`;
+        updatedEl.textContent = `Found ${data.counts.shortlisted} shortlisted roles, but no cover-note drafts or tailored resumes were reported. Check the latest Daily Job Search Digest logs -- the local model server may not have started. Email delivery separately requires RESEND_API_KEY. Job details remain private; this panel shows aggregate counts only.`;
         const failedStages = new Set(['resume-tailor', 'application-writer', 'application-reviewer']);
         agentEls.forEach(({ card, label }, id) => {
           if (!failedStages.has(id)) return;
@@ -169,6 +169,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
               status: failedStages.has(agent.id) ? 'failed' : agent.status,
             })),
             run_status: data.run_status,
+            runtime: data.runtime,
           },
         }));
       } else {

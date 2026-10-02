@@ -1,7 +1,8 @@
 """Job search agent: searches configured sources, scores matches against your
-profile, drafts application materials for the shortlist via the Gemini API,
-and writes a local HTML report for you to review. It does not submit anything
-anywhere -- you review each draft and apply manually on the original listing.
+profile, selects resume evidence locally, drafts application materials with a
+local model, and writes a local HTML report for you to review. It does not
+submit anything anywhere -- you review each draft and apply manually on the
+original listing.
 
 Usage:
     python main.py
@@ -12,7 +13,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # python-dotenv not installed -- GEMINI_API_KEY must be set some other way
+    pass  # python-dotenv not installed -- RESEND_API_KEY must be set some other way
 
 from job_agent.models import Job
 from job_agent.matcher import score_and_filter
@@ -128,19 +129,23 @@ def main():
     )
 
     model = config.get("local_model", "llama3.2:3b")
+    model_status = "idle"
     if material_jobs:
         print("\nDrafting application materials with the local model...")
         status.publish(
             "application-writer", "running", discovered=len(all_jobs),
             shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
+            model_status="running", model_name=model,
         )
         if wait_until_ready():
             installed = available_models()
             if installed and not any(name.startswith(model.split(":")[0]) for name in installed):
                 print(f"  [drafter] model {model} is not installed; available: {', '.join(installed)}")
             draft_shortlist(material_jobs, profile, model, demand)
+            model_status = "completed"
         else:
             print("  [drafter] no local model server reachable; shortlist and resumes are still reported.")
+            model_status = "failed"
     elif shortlist:
         print("\nMaterial generation is capped at zero jobs for this run; writing the full shortlist report.")
     else:
@@ -198,6 +203,7 @@ def main():
             shortlisted=len(shortlist), drafted=drafted_count,
             resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
             phase_complete=True, feedback_analyst_status=feedback_status,
+            model_status=model_status, model_name=model,
         )
         raise
 
@@ -212,6 +218,7 @@ def main():
             shortlisted=len(shortlist), drafted=drafted_count,
             resumes_tailored=resumes_tailored, awaiting_review=drafted_count,
             phase_complete=True, feedback_analyst_status=feedback_status,
+            model_status=model_status, model_name=model,
         )
         return
     if not notifications_enabled:
@@ -224,6 +231,7 @@ def main():
         resumes_tailored=resumes_tailored,
         awaiting_review=drafted_count, phase_complete=True,
         feedback_analyst_status=feedback_status,
+        model_status=model_status, model_name=model,
     )
 
 
