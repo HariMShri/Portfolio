@@ -136,6 +136,11 @@ class Store:
         with self.conn.transaction():
             for statement in SCHEMA:
                 self.conn.execute(statement)
+            # Added for the Claude connector: what an approval of this row covers,
+            # and where it can be applied, computed once here so no other
+            # component has to re-implement those rules.
+            self.conn.execute("alter table shortlist add column if not exists approval_hash text")
+            self.conn.execute("alter table shortlist add column if not exists apply_platform text")
 
     @staticmethod
     def _json(value):
@@ -167,12 +172,14 @@ class Store:
                 )
                 self.conn.execute(
                     """insert into shortlist (run_id, job_id, rank, match_score, match_reasons, is_new, draft_resume,
-                                              resume_review, cover_note, cover_review, qa, fit_gap)
-                       values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                              resume_review, cover_note, cover_review, qa, fit_gap,
+                                              approval_hash, apply_platform)
+                       values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        on conflict (run_id, job_id) do nothing""",
                     (run_id, job.job_id, rank, job.match_score, self._json(job.match_reasons), bool(job.is_new),
                      self._json(job.draft_resume), self._json(job.resume_review), job.draft_cover_note,
-                     self._json(job.cover_review), self._json(job.draft_qa), self._json(job.fit_gap)),
+                     self._json(job.cover_review), self._json(job.draft_qa), self._json(job.fit_gap),
+                     *_approval_fields(job)),
                 )
         return run_id
 
@@ -314,6 +321,18 @@ class Store:
             table: self.conn.execute(f"select count(*) from {table}").fetchone()[0]
             for table in ("runs", "jobs", "shortlist", "outcomes", "applications", "approvals", "memories")
         }
+
+
+def _approval_fields(job) -> tuple:
+    """(approval_hash, apply_platform) for a shortlist row. A hash only exists
+    for a job with a passing resume package and a form the Applicant can fill."""
+    from .applicant import destination_for
+    from .approvals import content_hash
+
+    data = job.to_dict()
+    destination = destination_for(data)
+    ready = destination and job.draft_resume and (job.resume_review or {}).get("passed")
+    return (content_hash(data) if ready else None), (destination["platform"] if destination else None)
 
 
 JOB_COLUMNS = (

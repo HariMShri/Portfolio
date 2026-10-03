@@ -1,0 +1,20 @@
+{
+  "name": "shrihari-career-connector",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.1",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@neondatabase/serverless": "^1.2.0",
+    "agents": "^0.26.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

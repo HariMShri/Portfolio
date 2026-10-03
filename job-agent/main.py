@@ -321,6 +321,7 @@ def main():
             run_id = store.save_run(shortlist, len(all_jobs))
             save_memory_file(store, "ats_memory", "output/ats_memory.json")
             save_memory_file(store, "career_memory", "output/career_memory.json")
+            store.save_memory("profile", profile)  # the connector renders resumes from it
             print(f"  [store] saved run {run_id}: {len(shortlist)} shortlisted jobs and both memories")
         except Exception as error:
             print(f"  [store] couldn't save this run ({type(error).__name__}); the report and email are unaffected")

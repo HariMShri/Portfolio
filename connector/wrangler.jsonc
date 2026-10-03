@@ -1,0 +1,30 @@
+{
+  // Shri Hari's career connector: MCP server for Claude + private dashboard.
+  // Secrets (set with `npx wrangler secret put NAME`, never committed):
+  //   DATABASE_URL          the job agent's Neon connection string
+  //   GITHUB_CLIENT_ID      GitHub OAuth app (callback: https://<this worker>/callback)
+  //   GITHUB_CLIENT_SECRET
+  //   COOKIE_SECRET         32+ random characters, signs dashboard sessions
+  "name": "shrihari-career-connector",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  // global_fetch_strictly_public lets the OAuth provider fetch Client ID
+  // Metadata Documents safely (public internet only).
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    // The only GitHub account that can sign in, to Claude or the dashboard.
+    "ALLOWED_GITHUB_LOGIN": "HariMShri",
+    // This Worker's public address, used in OAuth discovery for MCP clients.
+    "PUBLIC_URL": "https://shrihari-career-connector.shriharigamer.workers.dev"
+  },
+  "kv_namespaces": [
+    {
+      // Required by workers-oauth-provider. Create with:
+      //   npx wrangler kv namespace create OAUTH_KV
+      // and paste the id here.
+      "binding": "OAUTH_KV",
+      "id": "REPLACE_WITH_OAUTH_KV_ID"
+    }
+  ],
+  "observability": { "enabled": true }
+}
