@@ -178,6 +178,10 @@ def main():
                                             ("career_memory", "output/career_memory.json"))
                     if restore_memory_file(store, name, path)]
         print(f"  [store] connected" + (f"; restored {', '.join(restored)} from the database" if restored else ""))
+        # Don't hold the connection through the long middle of the run: Neon
+        # closes idle connections, so reconnect for each later step instead.
+        store.close()
+    use_db = store is not None
     sites_memory = career_memory.load("output")
     all_jobs = collect_jobs(config, sites_memory)
     print(f"\nTotal jobs fetched (before scoring/dedup): {len(all_jobs)}")
@@ -283,6 +287,7 @@ def main():
         awaiting_review=drafted_count,
     )
     print(f"\nReport written to:\n  {html_path}\n  {pdf_path}\n  {json_path}")
+    store = Store.open() if use_db else None
     if store is not None:
         try:
             run_id = store.save_run(shortlist, len(all_jobs))
