@@ -131,6 +131,36 @@ drafts are built by selecting and ordering exact highlights and skills from
 `profile.json`; the source PDF is left unchanged. All output is gitignored and
 never committed.
 
+## Applying on your behalf (Applicant)
+
+```
+python apply.py                  # list jobs in the latest report and how each can be applied to
+python apply.py --job-id <id>    # prepare, approve and apply to one job
+python apply.py --all            # every job with a Greenhouse/Lever form, one approval each
+```
+
+Run it locally after `python main.py`. For each job it builds a tailored
+resume PDF (plus a cover letter PDF when a usable draft exists) under
+`output/applications/<job_id>/`, shows you the files, the cover note and the
+exact form URL, and asks: **submit for me**, **fill the form and I'll press
+submit**, or skip. Your answer is stored as an approval tied to that job, URL
+and the SHA-256 of each file, valid for 24 hours; any change to a file or the
+destination needs a new approval.
+
+It then checks the posting is still open, opens the employer's form in a
+visible browser and enters your name, email, phone, links and files from
+`profile.json`. It submits only when you chose "submit for me" **and** no
+required field is left: employer-specific questions (work authorisation,
+notice period, salary, demographics) and CAPTCHAs are always left for you to
+answer in that window. A confirmed submission is recorded as `applied` for
+Feedback Analyst; attempts are logged to `output/applications.jsonl`.
+
+Only Greenhouse and Lever forms are automated. LinkedIn, Indeed and Naukri
+prohibit automated applications (accounts get banned), so for those jobs the
+Applicant prepares the files and opens the listing for you to apply. Name
+split for forms: the last word of `name` is the surname; set `first_name` and
+`last_name` in `profile.json` to override.
+
 ## Recording outcomes (Feedback Analyst)
 
 The agent never submits anything, so it has no way to know on its own
