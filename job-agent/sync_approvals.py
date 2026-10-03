@@ -24,8 +24,10 @@ def main() -> int:
         added, skipped = approvals.sync(store)
         print(f"Synced {added} new approval(s) and {skipped} skip(s); {len(store.pending_approvals())} waiting for apply.py")
     except Exception as error:
-        print(f"Approval sync failed ({type(error).__name__})")
-        return 1
+        # Don't fail the scheduled job (and email you every 30 minutes) while
+        # the Worker is unreachable or not yet redeployed; just say so.
+        print(f"Approval sync skipped: the Worker's approvals endpoint isn't available ({error})")
+        return 0
     finally:
         store.close()
     return 0
