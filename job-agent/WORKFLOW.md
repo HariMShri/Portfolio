@@ -82,3 +82,8 @@ The job-agent sends snapshots to an authenticated worker write route. The worker
 ## Sources, memory and logins
 
 Role Scout reads company job boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) through their public candidate feeds, resolves company careers pages to those boards (or schema.org `JobPosting` data), and searches remote roles. `job_agent/career_memory.py` keeps per-board status and yield, careers-page resolutions, hashed seen-job IDs and per-platform apply routes in the Actions cache; boards that fail repeatedly are parked and retried later. No agent ever signs in to any account, stores a password, or attempts to pass a login or CAPTCHA: login-only careers pages are recorded as `login_required` and skipped, Workday applications are always left to the user, and a sign-in screen during an application ends the attempt with `login_required`.
+
+## Approvals by email
+
+The Application Coordinator requests approval on its own: the digest carries signed Submit / Fill only / Skip links (HMAC-SHA256 with the runner's status token; 3-day link expiry) for jobs with an automatable form and a passing package. The Worker records a decision only on an explicit POST from its confirmation page, never on a GET, so link prefetching cannot approve anything. Each approval stores the job ID, scope, approver, approval time, a 48-hour expiry, and a SHA-256 over the exact approved content (form URL, resume selection, fact-checked cover note). `apply.py` recomputes that hash immediately before acting and refuses on any mismatch, expiry or closed posting; each approval is consumed once. Approval for one job never carries to another.
+

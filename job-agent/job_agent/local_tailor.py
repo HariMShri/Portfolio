@@ -85,6 +85,7 @@ def select_evidence(
     demand=None,
     max_experience: int = 3,
     max_highlights: int = 4,
+    boosts: dict = None,
 ) -> dict:
     """Return the same shape the drafting step used to ask a model for:
     {"experience": [{"experience_index": int, "highlight_indices": [int]}],
@@ -104,6 +105,9 @@ def select_evidence(
             score_highlight(text, job_tokens, job_text_norm, profile_skills)
             for text in highlights
         ]
+        if boosts:
+            # Bullets that were on resumes which got interviews win close calls.
+            scores = [s + boosts.get((index, i), 0.0) if s > 0 else s for i, s in enumerate(scores)]
         ranked = sorted(range(len(highlights)), key=lambda i: (-scores[i], i))
         chosen = [i for i in ranked[:max_highlights] if scores[i] > 0]
         if not chosen:

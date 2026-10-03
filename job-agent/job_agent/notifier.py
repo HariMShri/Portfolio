@@ -45,7 +45,41 @@ def _summary_html(jobs: list[Job], profile: dict) -> str:
     """
 
 
-def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> bool:
+def _approvals_html(jobs: list[Job], links: dict) -> str:
+    """The agents asking you, per job, whether to apply. Each button opens a
+    confirmation page; nothing is recorded until you press its button there."""
+    import html as html_lib
+
+    rows = []
+    for job in jobs:
+        job_links = (links or {}).get(job.job_id)
+        if not job_links:
+            continue
+        button = ('<a href="{href}" style="display:inline-block;margin:4px 6px 0 0;padding:8px 14px;border-radius:999px;'
+                  'background:{bg};color:{fg};text-decoration:none;font-weight:600;font-size:13px">{label}</a>')
+        buttons = "".join(button.format(href=html_lib.escape(job_links[scope]), bg=bg, fg=fg, label=label) for scope, bg, fg, label in (
+            ("submit", "#1e7d32", "#ffffff", "Submit for me"),
+            ("fill", "#e8eef5", "#1a1a1a", "Fill only, I'll submit"),
+            ("skip", "#f4f4f4", "#555555", "Skip"),
+        ))
+        note = "Cover note attached" if (job.cover_review or {}).get("passed") else "No cover note (none passed the fact check)"
+        rows.append(
+            f'<li style="margin-bottom:16px"><strong>{html_lib.escape(job.title)}</strong> at {html_lib.escape(job.company)}'
+            f' ({job.match_score:.0f} match) &middot; <a href="{html_lib.escape(job.url)}">listing</a><br>'
+            f'<span style="color:#666;font-size:12px">Tailored resume attached &middot; {note}</span><br>{buttons}</li>'
+        )
+    if not rows:
+        return ""
+    return f"""
+    <h3 style="margin-top:28px">Waiting for your approval</h3>
+    <p style="color:#555;font-size:14px">These have application forms the Applicant can fill. Review the attached
+    resume and the cover note in the report, then choose. Approvals last 48 hours and are carried out the next
+    time you run <code>python apply.py</code> on your PC. Questions only you can answer are always left to you.</p>
+    <ul style="padding-left:18px">{''.join(rows)}</ul>
+    """
+
+
+def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, approval_links: dict = None) -> bool:
     notify_cfg = config.get("notify", {})
     if not notify_cfg.get("enabled"):
         return False
@@ -72,6 +106,7 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> 
     <h2>Daily Job Search Digest</h2>
     <p style="color:#666; font-size:0.85em">{date_str}</p>
     {_summary_html(jobs, profile)}
+    {_approvals_html(jobs, approval_links)}
     </body></html>
     """
 

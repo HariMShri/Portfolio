@@ -1,7 +1,9 @@
 """Apply to shortlisted jobs on your behalf -- each one only after you approve it.
 
 Usage:
-    python apply.py                    # list jobs in the latest report and how each can be applied to
+    python apply.py                    # carry out the applications you approved from the digest email
+                                       # (or, with none waiting, list today's shortlist)
+    python apply.py --list             # just list the shortlist
     python apply.py --job-id a1b2c3    # prepare, approve and apply to one job
     python apply.py --all              # walk every job that has an application form, one approval each
 
@@ -33,7 +35,7 @@ try:
 except ImportError:
     pass
 
-from job_agent import applicant, career_memory
+from job_agent import applicant, approvals, career_memory
 from job_agent.store import Store
 from job_agent.outcomes import record_outcome
 
@@ -104,7 +106,7 @@ def run_browser(package, profile, scope, output_dir, headless):
         from playwright.sync_api import sync_playwright
     except ImportError:
         print("  Playwright isn't installed: pip install playwright && python -m playwright install chromium")
-        return
+        return "blocked"
     platform = package.destination["platform"]
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
@@ -137,6 +139,7 @@ def run_browser(package, profile, scope, output_dir, headless):
                 input("  Finish the form in the browser window if you want to apply, then press Enter here... ")
                 confirm_user_submitted(output_dir, package, platform)
         browser.close()
+    return attempt.status
 
 
 def handle(job: dict, profile: dict, args) -> None:
@@ -180,6 +183,60 @@ def handle(job: dict, profile: dict, args) -> None:
     run_browser(package, profile, approval["scope"], args.output_dir, args.headless)
 
 
+def run_email_approvals(profile: dict, args) -> int:
+    """Carry out the approvals you clicked in the digest email. Returns how many
+    were found. Each is re-checked against the exact content it approved."""
+    store = Store.open()
+    if store is None:
+        return 0
+    try:
+        try:
+            approvals.sync(store)  # pick up clicks made since the last daily run
+        except Exception:
+            pass  # STATUS_API_URL/STATUS_API_TOKEN not in .env: the daily run syncs them instead
+        pending = store.pending_approvals()
+        jobs = {item["job_id"]: store.latest_job(item["job_id"]) for item in pending}
+    finally:
+        store.close()  # don't hold a connection open while the browser works
+    if not pending:
+        return 0
+    print(f"{len(pending)} application(s) you approved from the digest email:")
+
+    for approval in pending:
+        job = jobs.get(approval["job_id"])
+        if not job:
+            result, reason = "blocked", "the job is no longer in the database"
+        elif approvals.content_hash(job) != approval["content_hash"]:
+            result, reason = "blocked", "the resume, cover note or form changed after you approved it"
+        else:
+            result, reason = None, ""
+        if result is None:
+            try:
+                package = applicant.build_package(job, profile, args.output_dir, rebuild=True)
+            except applicant.PackageError as error:
+                result, reason = "blocked", str(error)
+        if result is None and package.cover_note != approvals.approved_cover_note(job):
+            result, reason = "blocked", "the cover note differs from the one you approved"
+        if result is None:
+            describe(package, profile)
+            print(f"  Approved by you: {approval['scope']} (valid until {approval['expires_at'][:16]} UTC)")
+            if not package.destination or not applicant.listing_open(package.destination):
+                result, reason = "blocked", "the posting is no longer open"
+            else:
+                result = run_browser(package, profile, approval["scope"], args.output_dir, args.headless) or "blocked"
+        if reason:
+            title = (job or {}).get("title", approval["job_id"])
+            print(f"\n  {title}: not applying -- {reason}")
+            applicant.log_attempt(args.output_dir, applicant.Attempt(approval["job_id"], "email", "blocked", reason))
+        done = Store.open()
+        if done is not None:
+            try:
+                done.mark_approval_used(approval["job_id"], result)
+            finally:
+                done.close()
+    return len(pending)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--job-id", help="job_id from the report (shown by `python apply.py`)")
@@ -190,14 +247,19 @@ def main() -> int:
     parser.add_argument("--no-cover-letter", action="store_true", help="never attach the drafted cover note")
     parser.add_argument("--rebuild", action="store_true", help="regenerate files (needs a fresh approval)")
     parser.add_argument("--headless", action="store_true", help="no visible browser (you can't finish forms)")
+    parser.add_argument("--list", action="store_true", help="only list the shortlist; don't act on email approvals")
     args = parser.parse_args()
+
+    with open(args.profile, encoding="utf-8") as f:
+        profile = json.load(f)
+    if not (args.job_id or args.all or args.list or args.local):
+        if run_email_approvals(profile, args):
+            return 0
 
     report, jobs = load_shortlist(args.output_dir, args.local)
     if not jobs:
         print("No shortlist found in the database or output/. Set DATABASE_URL in .env, or run `python main.py`.")
         return 1
-    with open(args.profile, encoding="utf-8") as f:
-        profile = json.load(f)
     print(f"Using {report} ({len(jobs)} jobs)")
 
     if args.job_id:

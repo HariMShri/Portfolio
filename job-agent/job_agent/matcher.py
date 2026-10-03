@@ -119,8 +119,13 @@ def _extract_years_required(text: str) -> int | None:
     return max(int(m) for m in matches)
 
 
-def score_and_filter(jobs: list[Job], profile: dict, min_score: float, demand: Optional[dict] = None) -> list[Job]:
+def score_and_filter(jobs: list[Job], profile: dict, min_score: float, demand: Optional[dict] = None,
+                     calibration: Optional[dict] = None) -> list[Job]:
+    from .learning import apply_calibration
+
     scored = [score_job(j, profile, demand) for j in jobs]
+    for job in scored:
+        apply_calibration(job, calibration)  # what past outcomes say about each source
     seen = set()
     deduped = []
     for j in sorted(scored, key=lambda x: x.match_score, reverse=True):

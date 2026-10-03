@@ -174,6 +174,35 @@ hashed job IDs, dates and counts are stored.
 - Optional `writing_sample` in `profile.json`: a paragraph in your own words
   that the Application Writer matches for tone (never for facts).
 
+## Approvals from your inbox
+
+The agents ask you on their own. Each daily digest has a **Waiting for your
+approval** section: for every job with a Greenhouse or Lever form and a
+fact-checked package, three buttons -- **Submit for me**, **Fill only, I'll
+submit**, **Skip**. A button opens a confirmation page on the portfolio's
+Cloudflare Worker; your decision is recorded only when you press the button
+on that page (mail scanners open links, so a click on the email alone never
+counts). Links are HMAC-signed with the runner's `STATUS_API_TOKEN` and
+expire after 3 days; a recorded approval is valid for 48 hours.
+
+`sync-approvals.yml` copies decisions into Neon every 30 minutes. Then just
+run `python apply.py`: it carries out each approval, after re-checking that
+the form, resume selection and cover note are exactly what you approved
+(any change blocks it). Skips become a `skipped` outcome and the job is never
+offered again.
+
+## How the agents learn from the database
+
+`job_agent/learning.py` -- counting over stored runs and outcomes, no model:
+
+- **Fit Analyst**: sources whose jobs led to interviews more than average get
+  up to +5, those that never do up to -5, once a source has 5 resolved outcomes.
+- **Resume Tailor**: bullets that were on resumes which got interviews win
+  close calls (order only; content always comes from profile.json).
+- **Application Writer**: reuses a job's fact-checked cover note instead of a
+  new model call; each day's drafting goes to jobs without one yet.
+- **Coordinator**: never re-asks about a job you approved or skipped.
+
 ## Applying on your behalf (Applicant)
 
 ```

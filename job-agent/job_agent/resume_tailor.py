@@ -91,8 +91,9 @@ def fit_gap(job: Job, profile: dict, demand: Optional[dict] = None) -> dict:
     return {"covered": covered[:15], "missing": missing[:10]}
 
 
-def tailor_resume_for_job(job: Job, profile: dict, demand: Optional[dict] = None) -> Job:
-    plan = select_evidence(job, profile, demand)
+def tailor_resume_for_job(job: Job, profile: dict, demand: Optional[dict] = None,
+                          boosts: Optional[dict] = None) -> Job:
+    plan = select_evidence(job, profile, demand, boosts=boosts)
     safe_plan, issues = validate_resume_plan(plan, profile)
     job.draft_resume = safe_plan
     job.resume_review = {"passed": not issues, "issues": issues}
@@ -100,8 +101,9 @@ def tailor_resume_for_job(job: Job, profile: dict, demand: Optional[dict] = None
     return job
 
 
-def tailor_shortlist(jobs: list[Job], profile: dict, demand: Optional[dict] = None) -> list[Job]:
+def tailor_shortlist(jobs: list[Job], profile: dict, demand: Optional[dict] = None,
+                     boosts: Optional[dict] = None) -> list[Job]:
     for index, job in enumerate(jobs, start=1):
         print(f"  [resume-tailor] selecting evidence {index}/{len(jobs)}")
-        tailor_resume_for_job(job, profile, demand)
+        tailor_resume_for_job(job, profile, demand, boosts)
     return jobs

@@ -27,7 +27,7 @@ from job_agent import ats_memory
 from job_agent.local_llm import available_models, wait_until_ready
 from job_agent.status import StatusPublisher
 from job_agent.sources import careers, indeed, linkedin, naukri, manual, remotive
-from job_agent import applicant, career_memory
+from job_agent import applicant, approvals, career_memory, learning
 from job_agent.store import Store, restore_memory_file, save_memory_file
 
 
@@ -153,14 +153,17 @@ def collect_jobs(config: dict, memory: dict) -> list[Job]:
     return jobs
 
 
-def pick_material_jobs(shortlist: list[Job], limit: int, prefer_auto_apply: bool) -> list[Job]:
-    """Which jobs get a tailored resume and cover note. With prefer_auto_apply,
-    jobs the Applicant can submit (Greenhouse/Lever forms) go first, so the
-    drafts land where they can actually be used; then new jobs; then score."""
+def pick_material_jobs(shortlist: list[Job], limit: int, prefer_auto_apply: bool,
+                       decided: frozenset = frozenset(), drafted: frozenset = frozenset()) -> list[Job]:
+    """Which jobs get a tailored resume and cover note. Jobs you've already
+    approved or skipped are left out. With prefer_auto_apply, jobs the
+    Applicant can submit go first, so drafts land where they can be used;
+    then jobs without a draft yet; then new jobs; then score."""
+    candidates = [job for job in shortlist if job.job_id not in decided]
     if not prefer_auto_apply:
-        return shortlist[:limit]
-    ranked = sorted(shortlist, key=lambda job: (
-        applicant.destination_for(job.to_dict()) is None, not job.is_new, -job.match_score,
+        return candidates[:limit]
+    ranked = sorted(candidates, key=lambda job: (
+        applicant.destination_for(job.to_dict()) is None, job.job_id in drafted, not job.is_new, -job.match_score,
     ))
     return ranked[:limit]
 
@@ -178,10 +181,20 @@ def main():
                                             ("career_memory", "output/career_memory.json"))
                     if restore_memory_file(store, name, path)]
         print(f"  [store] connected" + (f"; restored {', '.join(restored)} from the database" if restored else ""))
+        try:
+            added, skipped = approvals.sync(store)
+            if added or skipped:
+                print(f"  [approvals] {added} new approval(s), {skipped} skip(s) from the digest email")
+        except Exception as error:
+            print(f"  [approvals] couldn't sync from the worker ({type(error).__name__})")
+        learned = learning.load(store)
+        print(f"  [learning] {learning.summarize(learned)}")
         # Don't hold the connection through the long middle of the run: Neon
         # closes idle connections, so reconnect for each later step instead.
         store.close()
     use_db = store is not None
+    if not use_db:
+        learned = learning.load(None)
     sites_memory = career_memory.load("output")
     all_jobs = collect_jobs(config, sites_memory)
     print(f"\nTotal jobs fetched (before scoring/dedup): {len(all_jobs)}")
@@ -189,7 +202,8 @@ def main():
 
     # Score with what earlier runs learned about skill demand.
     prior_demand = ats_memory.demand(ats_memory.load("output"))
-    shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35), prior_demand)
+    shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35), prior_demand,
+                                 learned["calibration"])
     print(f"Shortlist after scoring/dedup (>= {config.get('min_match_score', 35)} match): {len(shortlist)}")
     remote_count = sum(job.work_mode.startswith("remote") for job in shortlist)
     new_count = career_memory.mark_new(sites_memory, shortlist)
@@ -206,7 +220,8 @@ def main():
         print("  [career-memory] parked: " + ", ".join(site_summary["parked"]))
 
     material_limit = max(0, int(config.get("max_ai_jobs_per_run", 3)))
-    material_jobs = pick_material_jobs(shortlist, material_limit, config.get("prefer_auto_apply", True))
+    material_jobs = pick_material_jobs(shortlist, material_limit, config.get("prefer_auto_apply", True),
+                                       frozenset(learned["decided"]), frozenset(learned["drafts"]))
     if len(material_jobs) < len(shortlist):
         print(
             f"Writing application materials for the top {len(material_jobs)} shortlisted jobs "
@@ -223,7 +238,7 @@ def main():
         "resume-tailor", "running", discovered=len(all_jobs),
         shortlisted=len(shortlist),
     )
-    tailor_shortlist(material_jobs, profile, demand)
+    tailor_shortlist(material_jobs, profile, demand, learned["boosts"])
     resumes_tailored = sum(
         job.draft_resume is not None and bool(job.resume_review and job.resume_review.get("passed"))
         for job in material_jobs
@@ -231,7 +246,18 @@ def main():
 
     model = config.get("local_model", "llama3.2:3b")
     model_status = "idle"
-    if material_jobs:
+    # Application Writer: reuse fact-checked notes from earlier runs instead of
+    # asking the model again; only jobs without one need drafting.
+    reused = learning.reusable_drafts(learned["drafts"], material_jobs)
+    for job in material_jobs:
+        if job.job_id in reused:
+            job.draft_cover_note = reused[job.job_id]["cover_note"]
+            job.draft_qa = reused[job.job_id]["qa"]
+    to_draft = [job for job in material_jobs if job.job_id not in reused]
+    if reused:
+        print(f"  [drafter] reusing {len(reused)} fact-checked cover note(s) from earlier runs; "
+              f"{len(to_draft)} to draft")
+    if to_draft:
         print("\nDrafting application materials with the local model...")
         status.publish(
             "application-writer", "running", discovered=len(all_jobs),
@@ -242,11 +268,13 @@ def main():
             installed = available_models()
             if installed and not any(name.startswith(model.split(":")[0]) for name in installed):
                 print(f"  [drafter] model {model} is not installed; available: {', '.join(installed)}")
-            draft_shortlist(material_jobs, profile, model, demand)
+            draft_shortlist(to_draft, profile, model, demand)
             model_status = "completed"
         else:
             print("  [drafter] no local model server reachable; shortlist and resumes are still reported.")
             model_status = "failed"
+    elif material_jobs:
+        print("  [drafter] every selected job already has a fact-checked note; no model calls needed")
     elif shortlist:
         print("\nMaterial generation is capped at zero jobs for this run; writing the full shortlist report.")
     else:
@@ -318,7 +346,16 @@ def main():
 
     print("\nSending daily digest...")
     try:
-        digest_sent = send_digest(shortlist, profile, config, pdf_path)
+        base, key = approvals.credentials()
+        links = {
+            job.job_id: approvals.approval_links(job.to_dict(), base, key)
+            for job in material_jobs
+            if applicant.destination_for(job.to_dict()) and job.resume_review and job.resume_review.get("passed")
+        }
+        links = {job_id: value for job_id, value in links.items() if value}
+        if links:
+            print(f"  [approvals] asking for approval on {len(links)} job(s) in the digest")
+        digest_sent = send_digest(shortlist, profile, config, pdf_path, links)
     except Exception:
         status.publish(
             "application-coordinator", "failed", discovered=len(all_jobs),

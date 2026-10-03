@@ -80,6 +80,16 @@ SCHEMA = (
         blockers jsonb,
         at timestamptz not null
     )""",
+    """create table if not exists approvals (
+        job_id text primary key,
+        scope text not null,
+        content_hash text not null,
+        approver text,
+        approved_at timestamptz not null,
+        expires_at timestamptz not null,
+        consumed_at timestamptz,
+        result text
+    )""",
     """create table if not exists memories (
         name text primary key,
         data jsonb not null,
@@ -217,6 +227,75 @@ class Store:
              self._json(attempt.get("blockers") or []), attempt.get("at") or datetime.now(timezone.utc).isoformat()),
         )
 
+    # ---------- approvals (from the digest email's buttons) ----------
+
+    def upsert_approval(self, record: dict) -> bool:
+        """Store a decision; a newer click replaces an older one. Returns True if new."""
+        row = self.conn.execute(
+            """insert into approvals (job_id, scope, content_hash, approver, approved_at, expires_at)
+               values (%s, %s, %s, %s, %s, %s)
+               on conflict (job_id) do update set
+                 scope = excluded.scope, content_hash = excluded.content_hash, approver = excluded.approver,
+                 approved_at = excluded.approved_at, expires_at = excluded.expires_at,
+                 consumed_at = null, result = null
+               where approvals.approved_at < excluded.approved_at
+               returning job_id""",
+            (record["job_id"], record["scope"], record["content_hash"], record.get("approver", "email link"),
+             record["approved_at"], record["expires_at"]),
+        ).fetchone()
+        return row is not None
+
+    def pending_approvals(self) -> list[dict]:
+        """Unused, unexpired submit/fill approvals with the job they cover."""
+        rows = self.conn.execute(
+            """select a.job_id, a.scope, a.content_hash, a.approved_at, a.expires_at
+               from approvals a
+               where a.consumed_at is null and a.expires_at > now() and a.scope in ('submit', 'fill')
+               order by a.approved_at"""
+        ).fetchall()
+        return [{"job_id": r[0], "scope": r[1], "content_hash": r[2], "approved_at": r[3].isoformat(),
+                 "expires_at": r[4].isoformat()} for r in rows]
+
+    def mark_approval_used(self, job_id: str, result: str) -> None:
+        self.conn.execute("update approvals set consumed_at = now(), result = %s where job_id = %s", (result, job_id))
+
+    def decided_job_ids(self) -> set:
+        """Jobs you've already approved or skipped -- never ask about them again."""
+        return {r[0] for r in self.conn.execute("select job_id from approvals").fetchall()}
+
+    def latest_job(self, job_id: str) -> Optional[dict]:
+        row = self.conn.execute(
+            """select j.title, j.company, j.location, j.url, j.source, j.description, j.posted_date, s.match_score,
+                      s.match_reasons, s.draft_resume, s.resume_review, s.cover_note, s.qa, j.job_id, j.work_mode,
+                      s.cover_review, s.fit_gap, s.is_new, j.site
+               from shortlist s join jobs j using (job_id)
+               where s.job_id = %s order by (s.draft_resume is not null) desc, s.run_id desc limit 1""",
+            (job_id,),
+        ).fetchone()
+        return job_dict(row) if row else None
+
+    # ---------- what the agents learn from ----------
+
+    def previous_drafts(self) -> dict:
+        """job_id -> the newest cover note that passed the fact check, so the
+        Application Writer reuses it instead of asking the model again."""
+        rows = self.conn.execute(
+            """select distinct on (job_id) job_id, cover_note, qa, cover_review
+               from shortlist
+               where cover_note is not null and cover_note not like '[Drafting failed%%'
+                 and coalesce((cover_review->>'passed')::boolean, false)
+               order by job_id, run_id desc"""
+        ).fetchall()
+        return {r[0]: {"cover_note": r[1], "qa": r[2] or [], "cover_review": r[3]} for r in rows}
+
+    def resume_plans(self) -> dict:
+        """job_id -> the newest tailored resume selection used for it."""
+        rows = self.conn.execute(
+            """select distinct on (job_id) job_id, draft_resume from shortlist
+               where draft_resume is not null order by job_id, run_id desc"""
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
+
     # ---------- memories ----------
 
     def save_memory(self, name: str, data: dict) -> None:
@@ -233,7 +312,7 @@ class Store:
     def counts(self) -> dict:
         return {
             table: self.conn.execute(f"select count(*) from {table}").fetchone()[0]
-            for table in ("runs", "jobs", "shortlist", "outcomes", "applications", "memories")
+            for table in ("runs", "jobs", "shortlist", "outcomes", "applications", "approvals", "memories")
         }
 
 

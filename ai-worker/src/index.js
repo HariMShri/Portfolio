@@ -13,6 +13,8 @@
  * its own local keyword-matched replies, so the chat never just breaks.
  */
 
+import { handleApprove, handleListApprovals } from "./approvals.js";
+
 const ALLOWED_ORIGIN = "https://harimshri.github.io";
 const ALLOWED_ORIGINS = new Set([
   ALLOWED_ORIGIN,
@@ -275,6 +277,8 @@ export default {
     if (pathname === "/status") return handlePublicStatus(request, env);
     if (pathname === "/internal/status") return handleStatusUpdate(request, env);
     if (pathname === "/tts") return handleCartesiaTts(request, env);
+    if (pathname === "/approve") return handleApprove(request, env);
+    if (pathname === "/internal/approvals") return handleListApprovals(request, env);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
