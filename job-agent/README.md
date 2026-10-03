@@ -124,7 +124,9 @@ python main.py
 
 Output lands in `output/report_<timestamp>.pdf` (the one emailed to you),
 `.html` (same content, for quickly opening in a browser), `.json` (raw data),
-and one `resume_<timestamp>_<job>.html` per valid tailored resume. Resume
+and, per valid tailored resume, a `resume_<timestamp>_<job>.html` plus a
+send-ready `resume_<timestamp>_<n>_<company>_<role>.pdf`. The digest email
+attaches each of those PDFs as `Resume_<Name>_<company>_<role>.pdf`. Resume
 drafts are built by selecting and ordering exact highlights and skills from
 `profile.json`; the source PDF is left unchanged. All output is gitignored and
 never committed.

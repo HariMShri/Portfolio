@@ -4,6 +4,7 @@ without verifying your own domain -- fine for a personal reminder email to
 yourself. Requires RESEND_API_KEY as an env var; if it's not set, this just
 skips sending and logs why, same graceful-degradation pattern as the sources.
 """
+import glob
 import os
 from datetime import datetime
 from .models import Job
@@ -31,7 +32,8 @@ def _summary_html(jobs: list[Job], profile: dict) -> str:
     <p>{len(jobs)} job(s) matched today. Top ones:</p>
     <ul>{rows}</ul>
     {more}
-    <p>Full drafted cover notes and Q&amp;A are in the attached PDF report.
+    <p>Full drafted cover notes and Q&amp;A are in the attached PDF report, and each
+    tailored resume is attached as its own PDF, named after the company and role.
     Nothing has been submitted anywhere &mdash; review before applying.</p>
     """
 
@@ -79,11 +81,12 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> 
         "subject": subject,
         "html": body_html,
     }
+    attachments = []
     if pdf_bytes is not None:
-        payload["attachments"] = [{
-            "filename": f"job_report_{date_str}.pdf",
-            "content": _b64_bytes(pdf_bytes),
-        }]
+        attachments.append({"filename": f"job_report_{date_str}.pdf", "content": _b64_bytes(pdf_bytes)})
+    attachments += _resume_attachments(pdf_path, profile)
+    if attachments:
+        payload["attachments"] = attachments
 
     try:
         resp = requests.post(
@@ -95,7 +98,8 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> 
         if resp.status_code >= 300:
             print(f"  [notifier] Resend API returned {resp.status_code}: {resp.text[:300]}")
             return False
-        print(f"  [notifier] digest emailed to {notify_cfg.get('to_email')}")
+        resumes = max(0, len(attachments) - (pdf_bytes is not None))
+        print(f"  [notifier] digest emailed to {notify_cfg.get('to_email')} with {resumes} tailored resume PDF(s)")
         return True
     except requests.RequestException as e:
         print(f"  [notifier] send failed: {e}")
@@ -105,3 +109,29 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str) -> 
 def _b64_bytes(data: bytes) -> str:
     import base64
     return base64.b64encode(data).decode("ascii")
+
+
+def _resume_attachments(pdf_path: str, profile: dict) -> list[dict]:
+    """Tailored resume PDFs written beside the report by the same run.
+
+    The report is ``report_<timestamp>.pdf``; its resumes are
+    ``resume_<timestamp>_<n>_<company>_<role>.pdf``. Attached as
+    ``Resume_<Name>_<company>_<role>.pdf`` so each is ready to send on.
+    """
+    folder, report_name = os.path.split(pdf_path or "")
+    if not report_name.startswith("report_") or not report_name.endswith(".pdf"):
+        return []
+    timestamp = report_name[len("report_"):-len(".pdf")]
+    owner = "".join(ch for ch in profile.get("name", "") if ch.isalnum()) or "Candidate"
+    attachments = []
+    for path in sorted(glob.glob(os.path.join(folder or ".", f"resume_{timestamp}_*.pdf"))):
+        # Drop the "resume_<date>_<time>_<n>_" prefix, keep "<company>_<role>".
+        role_part = os.path.basename(path)[:-len(".pdf")].split("_", 4)[-1]
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError as e:
+            print(f"  [notifier] couldn't read a resume PDF, skipping it: {type(e).__name__}")
+            continue
+        attachments.append({"filename": f"Resume_{owner}_{role_part}.pdf", "content": _b64_bytes(data)})
+    return attachments

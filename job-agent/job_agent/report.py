@@ -97,6 +97,75 @@ h5{{font-size:13px;margin-bottom:0}}p,li{{font-size:12px}}ul{{padding-left:20px}
 @media print{{body{{margin:0 auto;padding:0}}}}</style></head><body>{content}</body></html>"""
 
 
+def _slug(text: str, limit: int = 40) -> str:
+    """Filename-safe fragment: letters and digits joined by hyphens."""
+    words = "".join(ch if ch.isalnum() else " " for ch in (text or "")).split()
+    return "-".join(words)[:limit].strip("-") or "role"
+
+
+def render_resume_pdf(job: Job, profile: dict, out_path: str) -> None:
+    """A standalone, send-ready resume PDF for one job: the same verified
+    facts as the HTML draft, laid out as a conventional single-column resume."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, KeepTogether
+
+    plan = job.draft_resume
+    doc = SimpleDocTemplate(
+        out_path, pagesize=A4, leftMargin=48, rightMargin=48, topMargin=42, bottomMargin=42,
+        title=f"{profile.get('name', '')} - Resume", author=profile.get("name", ""),
+    )
+    ink = colors.HexColor("#202124")
+    dim = colors.HexColor("#555555")
+    name_style = ParagraphStyle("Name", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=ink)
+    contact_style = ParagraphStyle("Contact", fontName="Helvetica", fontSize=9, leading=12, textColor=dim, spaceAfter=4)
+    heading_style = ParagraphStyle("Heading", fontName="Helvetica-Bold", fontSize=10.5, leading=13, textColor=ink,
+                                   spaceBefore=10, spaceAfter=2)
+    body_style = ParagraphStyle("Body", fontName="Helvetica", fontSize=9.6, leading=13.2, textColor=ink)
+    role_style = ParagraphStyle("Role", fontName="Helvetica-Bold", fontSize=10, leading=13, textColor=ink, spaceBefore=6)
+    dates_style = ParagraphStyle("Dates", fontName="Helvetica-Oblique", fontSize=8.8, leading=11.5, textColor=dim, spaceAfter=2)
+    bullet_style = ParagraphStyle("Bullet", parent=body_style, leftIndent=12, bulletIndent=2, spaceAfter=1.5)
+
+    def esc(s: str) -> str:
+        return html.escape(s or "")
+
+    def section(title: str) -> list:
+        return [Paragraph(title.upper(), heading_style),
+                HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#bbbbbb"), spaceAfter=4)]
+
+    contact = " | ".join(esc(v) for v in (
+        profile.get("email", ""), profile.get("phone", ""), profile.get("location", ""), profile.get("linkedin_url", ""),
+    ) if v)
+    story = [Paragraph(esc(profile.get("name", "")), name_style), Paragraph(contact, contact_style)]
+    story += section("Professional Summary")
+    story.append(Paragraph(esc(profile.get("summary", "")), body_style))
+    story += section("Core Skills")
+    story.append(Paragraph(esc(" | ".join(plan["skills"])), body_style))
+    story += section("Professional Experience")
+    for selection in plan.get("experience", []):
+        experience = profile["experience"][selection["experience_index"]]
+        client = experience.get("client", "")
+        block = [
+            Paragraph(f"{esc(experience.get('title', ''))} &mdash; {esc(experience.get('company', ''))}", role_style),
+            Paragraph(esc(experience.get("dates", "")) + (f" &middot; Client: {esc(client)}" if client else ""), dates_style),
+        ]
+        block += [Paragraph(esc(experience["highlights"][index]), bullet_style, bulletText="•")
+                  for index in selection["highlight_indices"]]
+        story.append(KeepTogether(block))
+    if profile.get("education"):
+        story += section("Education")
+        for item in profile["education"]:
+            story.append(Paragraph(
+                f"{esc(item.get('degree', ''))} &mdash; {esc(item.get('institution', ''))} ({esc(item.get('year', ''))})",
+                body_style,
+            ))
+    if profile.get("certifications"):
+        story += section("Certifications")
+        story += [Paragraph(esc(item), bullet_style, bulletText="•") for item in profile["certifications"]]
+    doc.build(story)
+
+
 def render_html(jobs: list[Job], profile: dict, resume_files: Optional[dict[int, str]] = None) -> str:
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
     job_blocks = []
@@ -285,6 +354,9 @@ def write_report(jobs: list[Job], profile: dict, out_dir: str = "output") -> tup
             with open(os.path.join(out_dir, filename), "w", encoding="utf-8") as resume_file:
                 resume_file.write(render_resume_html(job, profile))
             resume_files[id(job)] = filename
+            # A send-ready PDF beside it; the digest email attaches these.
+            pdf_name = f"resume_{timestamp}_{index}_{_slug(job.company, 24)}_{_slug(job.title)}.pdf"
+            render_resume_pdf(job, profile, os.path.join(out_dir, pdf_name))
 
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(render_html(jobs, profile, resume_files))

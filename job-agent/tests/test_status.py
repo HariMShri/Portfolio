@@ -197,6 +197,36 @@ class ResumePlanValidationTests(unittest.TestCase):
 
         self.assertIn(resume_files[0].name, report_html)
 
+    def test_digest_attaches_each_tailored_resume_pdf(self):
+        from job_agent.notifier import send_digest
+
+        profile = {
+            "name": "Candidate Name",
+            "email": "candidate@example.invalid",
+            "summary": "Verified summary.",
+            "experience": [{"company": "Example Employer", "title": "Test Engineer", "dates": "2020-2024",
+                            "highlights": ["Verified source fact"]}],
+            "education": [{"degree": "B.E.", "institution": "Example University", "year": "2019"}],
+            "certifications": ["ISTQB Foundation"],
+        }
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+        job.draft_resume = {"experience": [{"experience_index": 0, "highlight_indices": [0]}], "skills": ["SQL"]}
+        job.resume_review = {"passed": True, "issues": []}
+        config = {"notify": {"enabled": True, "to_email": "candidate@example.invalid"}}
+
+        with TemporaryDirectory() as output_dir:
+            _, pdf_path, _ = write_report([job], profile, output_dir)
+            resume_pdfs = list(Path(output_dir).glob("resume_*.pdf"))
+            self.assertEqual(len(resume_pdfs), 1)
+            self.assertTrue(resume_pdfs[0].read_bytes().startswith(b"%PDF"))
+            with patch.dict(os.environ, {"RESEND_API_KEY": "test-key"}),                     patch("requests.post") as post:
+                post.return_value.status_code = 200
+                self.assertTrue(send_digest([job], profile, config, pdf_path))
+
+        names = [item["filename"] for item in post.call_args.kwargs["json"]["attachments"]]
+        self.assertEqual(names[0].split("_")[:2], ["job", "report"])
+        self.assertEqual(names[1:], ["Resume_CandidateName_Example-Co_QA-Engineer.pdf"])
+
     def test_missing_credentials_disables_publishing(self):
         with patch.dict(os.environ, {}, clear=True), patch("job_agent.status.requests.post") as post:
             StatusPublisher().publish("role-scout", "running")
