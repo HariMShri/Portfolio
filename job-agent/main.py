@@ -28,6 +28,7 @@ from job_agent.local_llm import available_models, wait_until_ready
 from job_agent.status import StatusPublisher
 from job_agent.sources import careers, indeed, linkedin, naukri, manual, remotive
 from job_agent import applicant, career_memory
+from job_agent.store import Store, restore_memory_file, save_memory_file
 
 
 def load_json(path: str) -> dict:
@@ -170,6 +171,13 @@ def main():
     config = load_json("config.json")
 
     status.publish("role-scout", "running")
+    # Neon (optional): seed memories a cold cache lost, from the shared copy.
+    store = Store.open()
+    if store is not None:
+        restored = [name for name, path in (("ats_memory", "output/ats_memory.json"),
+                                            ("career_memory", "output/career_memory.json"))
+                    if restore_memory_file(store, name, path)]
+        print(f"  [store] connected" + (f"; restored {', '.join(restored)} from the database" if restored else ""))
     sites_memory = career_memory.load("output")
     all_jobs = collect_jobs(config, sites_memory)
     print(f"\nTotal jobs fetched (before scoring/dedup): {len(all_jobs)}")
@@ -275,12 +283,28 @@ def main():
         awaiting_review=drafted_count,
     )
     print(f"\nReport written to:\n  {html_path}\n  {pdf_path}\n  {json_path}")
+    if store is not None:
+        try:
+            run_id = store.save_run(shortlist, len(all_jobs))
+            save_memory_file(store, "ats_memory", "output/ats_memory.json")
+            save_memory_file(store, "career_memory", "output/career_memory.json")
+            print(f"  [store] saved run {run_id}: {len(shortlist)} shortlisted jobs and both memories")
+        except Exception as error:
+            print(f"  [store] couldn't save this run ({type(error).__name__}); the report and email are unaffected")
 
     # Best-effort and independent of digest success: analyzes whatever
     # outcomes the user has recorded with record_outcome.py since the last
     # run. Never raises -- a missed insight should never fail a job search.
     print("\nChecking for recorded outcomes (Feedback Analyst)...")
-    feedback_result, _ = run_feedback_analysis("output", config)
+    db_outcomes = db_index = None
+    if store is not None:
+        try:
+            db_outcomes, db_index = store.outcomes(), store.job_index()
+            print(f"  [store] {len(db_outcomes)} recorded outcome(s) in the database")
+        except Exception as error:
+            print(f"  [store] couldn't read outcomes ({type(error).__name__})")
+        store.close()
+    feedback_result, _ = run_feedback_analysis("output", config, db_outcomes, db_index)
     feedback_status = {
         "insufficient_data": "idle",
         "ok": "completed",

@@ -56,12 +56,20 @@ def _score_band(score: float) -> str:
     return "unknown"
 
 
-def analyze(output_dir: str, config: dict) -> dict:
+def analyze(output_dir: str, config: dict, extra_outcomes: Optional[list] = None,
+            extra_index: Optional[dict] = None) -> dict:
     """Return a proposal dict. Never raises for ordinary "not enough data
     yet" conditions; a run with zero recorded outcomes gets a clean
     ``insufficient_data`` result, not an error."""
     outcomes = load_outcomes(output_dir)
     job_index = _load_job_index(output_dir)
+    if extra_outcomes:
+        # The database holds outcomes recorded on any machine; merge, de-duplicated.
+        seen = {(o.get("job_id"), o.get("decision"), o.get("recorded_at")) for o in outcomes}
+        outcomes += [o for o in extra_outcomes
+                     if (o.get("job_id"), o.get("decision"), o.get("recorded_at")) not in seen]
+    if extra_index:
+        job_index = {**extra_index, **job_index}
 
     counts_by_decision: dict[str, int] = {}
     for outcome in outcomes:
@@ -162,12 +170,13 @@ def write_proposal(output_dir: str, result: dict) -> str:
     return path
 
 
-def run_feedback_analysis(output_dir: str, config: dict) -> tuple[dict, Optional[str]]:
+def run_feedback_analysis(output_dir: str, config: dict, extra_outcomes: Optional[list] = None,
+                          extra_index: Optional[dict] = None) -> tuple[dict, Optional[str]]:
     """Best-effort entry point for main.py: analyze, write a dated proposal
     file, and report what happened. Never raises -- a feedback-analysis
     failure is a missed insight, not a failed job search."""
     try:
-        result = analyze(output_dir, config)
+        result = analyze(output_dir, config, extra_outcomes, extra_index)
     except Exception as exc:
         print(f"  [feedback-analyst] analysis failed ({type(exc).__name__}); skipping this run")
         return {"status": "error"}, None

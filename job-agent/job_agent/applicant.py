@@ -333,6 +333,8 @@ class Attempt:
 
 def log_attempt(output_dir: str, attempt: Attempt) -> None:
     _append(output_dir, ATTEMPTS_FILENAME, asdict(attempt))
+    from .store import push
+    push("application", asdict(attempt))
 
 
 FIELD_SELECTORS = {

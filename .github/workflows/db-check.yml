@@ -47,8 +47,16 @@ jobs:
                   tables = conn.execute(
                       "select count(*) from information_schema.tables where table_schema = 'public'"
                   ).fetchone()[0]
+                  rows = {
+                      name: conn.execute(f"select count(*) from {name}").fetchone()[0]
+                      for (name,) in conn.execute(
+                          "select table_name from information_schema.tables where table_schema = 'public' order by 1"
+                      ).fetchall()
+                  }
           except Exception as error:
               # Error class only: messages can echo connection details.
               sys.exit(f"Connection FAILED: {type(error).__name__}")
           print(f"Connected OK: database={db}, Postgres {version}, public tables={tables}")
+          for name, count in rows.items():
+              print(f"  {name}: {count} rows")
           PY

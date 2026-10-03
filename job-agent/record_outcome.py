@@ -16,7 +16,24 @@ directly and this looks the job up for you.
 import argparse
 import sys
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # DATABASE_URL, so the outcome also reaches the shared database
+except ImportError:
+    pass
+
 from job_agent.outcomes import DECISIONS, find_job_by_id, record_outcome
+
+
+def _job_from_database(job_id: str):
+    from job_agent.store import Store
+    store = Store.open(quiet=True)
+    if store is None:
+        return None
+    try:
+        return store.job_index().get(job_id)
+    finally:
+        store.close()
 
 
 def main() -> int:
@@ -31,7 +48,7 @@ def main() -> int:
 
     company, title, job_id = args.company, args.title, args.job_id
     if job_id and not (company and title):
-        job = find_job_by_id(args.output_dir, job_id)
+        job = find_job_by_id(args.output_dir, job_id) or _job_from_database(job_id)
         if job:
             company = company or job.get("company", "")
             title = title or job.get("title", "")

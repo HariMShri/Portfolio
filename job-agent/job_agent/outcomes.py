@@ -51,6 +51,9 @@ def record_outcome(
     os.makedirs(output_dir, exist_ok=True)
     with open(_path(output_dir), "a", encoding="utf-8") as f:
         f.write(json.dumps(asdict(outcome), ensure_ascii=False) + "\n")
+    # Best-effort copy to the shared database so the daily run sees it too.
+    from .store import push
+    push("outcome", asdict(outcome))
     return outcome
 
 

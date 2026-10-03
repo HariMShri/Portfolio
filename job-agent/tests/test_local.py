@@ -1,3 +1,6 @@
+import os as _os
+
+_os.environ["DATABASE_URL"] = ""  # tests never touch the real shared database
 """Tests for the local pipeline: deterministic tailoring, ATS memory, and
 the local model client that replaced the hosted API."""
 import json

@@ -27,7 +27,14 @@ import sys
 import webbrowser
 from dataclasses import asdict
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # DATABASE_URL from the gitignored .env
+except ImportError:
+    pass
+
 from job_agent import applicant, career_memory
+from job_agent.store import Store
 from job_agent.outcomes import record_outcome
 
 
@@ -41,6 +48,21 @@ def latest_report(output_dir: str):
         if not job.get("job_id"):
             job["job_id"] = applicant.job_from_dict(job).job_id
     return reports[-1], jobs
+
+
+def load_shortlist(output_dir: str, local_only: bool):
+    """Today's shortlist from the shared database (written by the daily run),
+    falling back to the newest local report_*.json."""
+    if not local_only:
+        store = Store.open()
+        if store is not None:
+            try:
+                run_id, created_at, jobs = store.latest_shortlist()
+            finally:
+                store.close()
+            if jobs:
+                return f"database run {run_id} ({created_at:%Y-%m-%d %H:%M} UTC)", jobs
+    return latest_report(output_dir)
 
 
 def ask(prompt: str, choices: str, default: str) -> str:
@@ -163,15 +185,16 @@ def main() -> int:
     parser.add_argument("--job-id", help="job_id from the report (shown by `python apply.py`)")
     parser.add_argument("--all", action="store_true", help="go through every job with an application form")
     parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--local", action="store_true", help="use the newest local report instead of the database")
     parser.add_argument("--profile", default="profile.json")
     parser.add_argument("--no-cover-letter", action="store_true", help="never attach the drafted cover note")
     parser.add_argument("--rebuild", action="store_true", help="regenerate files (needs a fresh approval)")
     parser.add_argument("--headless", action="store_true", help="no visible browser (you can't finish forms)")
     args = parser.parse_args()
 
-    report, jobs = latest_report(args.output_dir)
+    report, jobs = load_shortlist(args.output_dir, args.local)
     if not jobs:
-        print("No report found. Run `python main.py` first to search and shortlist jobs.")
+        print("No shortlist found in the database or output/. Set DATABASE_URL in .env, or run `python main.py`.")
         return 1
     with open(args.profile, encoding="utf-8") as f:
         profile = json.load(f)

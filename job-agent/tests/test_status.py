@@ -1,3 +1,6 @@
+import os as _os
+
+_os.environ["DATABASE_URL"] = ""  # tests never touch the real shared database
 import os
 import json
 import unittest
