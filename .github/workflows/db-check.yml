@@ -29,6 +29,18 @@ jobs:
           url = os.environ.get("DATABASE_URL", "")
           if not url:
               sys.exit("DATABASE_URL secret is not set.")
+          # Shape checks only -- these never print any part of the value.
+          checks = {
+              "starts with postgresql:// or postgres://": url.startswith(("postgresql://", "postgres://")),
+              "no surrounding quotes": url[:1] not in "'\"" and url[-1:] not in "'\"",
+              "no leading/trailing whitespace or newline": url == url.strip(),
+              "no 'DATABASE_URL=' prefix": not url.startswith("DATABASE_URL"),
+              "no 'psql' command wrapper": not url.startswith("psql"),
+              "contains a password (user:pass@)": url.count("@") == 1 and ":" in url.split("@")[0].split("//")[-1],
+              "has a database name (/neondb)": "/" in url.split("@")[-1],
+          }
+          for name, ok in checks.items():
+              print(f"  [{'ok' if ok else 'PROBLEM'}] {name}")
           try:
               with psycopg.connect(url, connect_timeout=15) as conn:
                   db, version = conn.execute("select current_database(), current_setting('server_version')").fetchone()
