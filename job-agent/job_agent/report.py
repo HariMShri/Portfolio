@@ -103,15 +103,31 @@ def _slug(text: str, limit: int = 40) -> str:
     return "-".join(words)[:limit].strip("-") or "role"
 
 
-def render_resume_pdf(job: Job, profile: dict, out_path: str) -> None:
-    """A standalone, send-ready resume PDF for one job: the same verified
-    facts as the HTML draft, laid out as a conventional single-column resume."""
+def render_resume_pdf(job: Job, profile: dict, out_path: str, max_pages: int = 1) -> int:
+    """A standalone, send-ready resume PDF for one job, kept to ``max_pages``.
+
+    If the selection runs long, the least relevant highlight (the last one
+    of the role with the most) is dropped and the page re-laid until it fits;
+    every role keeps at least one highlight. Returns the final page count."""
+    import copy
+
+    plan = copy.deepcopy(job.draft_resume)
+    while True:
+        pages = _build_resume_pdf(plan, profile, out_path)
+        if pages <= max_pages:
+            return pages
+        longest = max(plan.get("experience", []), key=lambda entry: len(entry["highlight_indices"]), default=None)
+        if not longest or len(longest["highlight_indices"]) <= 1:
+            return pages
+        longest["highlight_indices"].pop()
+
+
+def _build_resume_pdf(plan: dict, profile: dict, out_path: str) -> int:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, KeepTogether
 
-    plan = job.draft_resume
     doc = SimpleDocTemplate(
         out_path, pagesize=A4, leftMargin=48, rightMargin=48, topMargin=42, bottomMargin=42,
         title=f"{profile.get('name', '')} - Resume", author=profile.get("name", ""),
@@ -164,6 +180,19 @@ def render_resume_pdf(job: Job, profile: dict, out_path: str) -> None:
         story += section("Certifications")
         story += [Paragraph(esc(item), bullet_style, bulletText="•") for item in profile["certifications"]]
     doc.build(story)
+    return doc.page
+
+
+def _gap_html(job: Job) -> str:
+    gap = job.fit_gap or {}
+    if not gap.get("covered") and not gap.get("missing"):
+        return ""
+    parts = []
+    if gap.get("covered"):
+        parts.append("<strong>You have:</strong> " + html.escape(", ".join(gap["covered"])))
+    if gap.get("missing"):
+        parts.append("<strong>They also ask for:</strong> " + html.escape(", ".join(gap["missing"])))
+    return f'<p class="reasons">{" &middot; ".join(parts)}</p>'
 
 
 def render_html(jobs: list[Job], profile: dict, resume_files: Optional[dict[int, str]] = None) -> str:
@@ -179,9 +208,16 @@ def render_html(jobs: list[Job], profile: dict, resume_files: Optional[dict[int,
                 f'<div class="a">{html.escape(qa.get("answer", ""))}</div></div>'
                 for qa in (job.draft_qa or [])
             )
+            review = job.cover_review or {}
+            warning = (
+                '<p class="reasons"><strong>Fact check failed -- fix before using:</strong> '
+                + html.escape("; ".join(review.get("issues", []))) + "</p>"
+                if review and not review.get("passed") else ""
+            )
             draft_html = f"""
             <div class="draft">
               <h4>Drafted Cover Note (review before using)</h4>
+              {warning}
               <p>{html.escape(job.draft_cover_note)}</p>
               {'<h4>Drafted Q&amp;A</h4>' + qa_html if qa_html else ''}
             </div>
@@ -197,11 +233,12 @@ def render_html(jobs: list[Job], profile: dict, resume_files: Optional[dict[int,
             resume_html = f'<div class="draft resume-preview"><h4>Tailored Resume Draft (review before using)</h4>{resume_content}{link_html}</div>'
         job_blocks.append(f"""
         <div class="job">
-          <h2>{html.escape(job.title)}</h2>
+          <h2>{'<span class="score">NEW</span> ' if job.is_new else ''}{html.escape(job.title)}</h2>
           <div class="company">{html.escape(job.company)}</div>
           <div class="sub">{html.escape(job.location)} &middot; source: {html.escape(job.source)}
             &middot; <span class="score {_score_class(job.match_score)}">{job.match_score:.0f} match</span></div>
           <ul class="reasons">{reasons_html}</ul>
+          {_gap_html(job)}
           {draft_html}
           {resume_html}
           {'<a class="applylink" href="' + html.escape(job.url) + '" target="_blank">Open original listing &rarr;</a>' if job.url else ''}
@@ -281,9 +318,16 @@ def render_pdf(jobs: list[Job], profile: dict, out_path: str) -> None:
 
         for reason in job.match_reasons:
             story.append(Paragraph(f"&bull; {esc(reason)}", reason_style))
+        if job.fit_gap and job.fit_gap.get("missing"):
+            story.append(Paragraph("&bull; They also ask for: " + esc(", ".join(job.fit_gap["missing"])), reason_style))
 
         if job.draft_cover_note:
             story.append(Paragraph("DRAFTED COVER NOTE (review before using)", draft_label_style))
+            if job.cover_review and not job.cover_review.get("passed"):
+                story.append(Paragraph(
+                    "FACT CHECK FAILED -- fix before using: " + esc("; ".join(job.cover_review.get("issues", []))),
+                    ParagraphStyle("Warn", parent=reason_style, textColor=colors.HexColor("#a3271f")),
+                ))
             story.append(Paragraph(esc(job.draft_cover_note), draft_body_style))
 
         if job.draft_qa:

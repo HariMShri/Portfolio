@@ -24,6 +24,11 @@ class Job:
     draft_cover_note: Optional[str] = None
     draft_qa: Optional[list] = None
     job_id: str = ""
+    work_mode: str = ""  # onsite | remote_open | remote_unspecified | remote_restricted
+    cover_review: Optional[dict] = None
+    fit_gap: Optional[dict] = None
+    is_new: bool = False
+    site: str = ""  # career-memory key of the board this came from
 
     def __post_init__(self) -> None:
         # Stable across runs (derived from company+title, not row order or

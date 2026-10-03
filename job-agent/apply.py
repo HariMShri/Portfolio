@@ -27,7 +27,7 @@ import sys
 import webbrowser
 from dataclasses import asdict
 
-from job_agent import applicant
+from job_agent import applicant, career_memory
 from job_agent.outcomes import record_outcome
 
 
@@ -90,10 +90,14 @@ def run_browser(package, profile, scope, output_dir, headless):
         try:
             page.goto(package.destination["form_url"], wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(2500)
-            attempt = applicant.apply_in_page(page, package, profile, scope)
+            attempt = applicant.apply_in_page(page, package, profile, scope, answers=applicant.load_answers())
         except Exception as error:
             attempt = applicant.Attempt(package.job_id, platform, "blocked", f"browser error: {type(error).__name__}")
         applicant.log_attempt(output_dir, attempt)
+        # Teach the career memory what applying here actually takes.
+        memory = career_memory.load(output_dir)
+        career_memory.learn_apply_route(memory, platform, attempt.status)
+        career_memory.save(output_dir, memory)
 
         if attempt.status == "submitted":
             record_outcome(output_dir, package.job_id, package.company, package.title, "applied",

@@ -2,27 +2,61 @@
   "max_results_per_source": 25,
   "min_match_score": 35,
   "max_ai_jobs_per_run": 3,
+  "prefer_auto_apply": true,
   "greenhouse_boards": [
-    "stripe",
-    "airbnb",
-    "cloudflare",
-    "elastic",
-    "gitlab",
-    "hashicorp",
-    "confluentinc",
-    "grafanalabs",
-    "postman",
-    "figma",
+    "instacart",
+    "purestorage",
+    "coinbase",
+    "okta",
+    "fivetran",
     "affirm",
-    "coinbase"
+    "airbnb",
+    "databricks",
+    "highradius",
+    "druva",
+    "hackerrank",
+    "newrelic",
+    "samsara",
+    "stripe",
+    "cloudflare",
+    "figma",
+    "gitlab",
+    "elastic",
+    "grafanalabs",
+    "zscaler"
   ],
   "lever_boards": [
-    "netskope",
-    "razorpay",
-    "postman",
-    "sprinklr",
-    "freshworks"
+    "paytm",
+    "meesho",
+    "zeta",
+    "cred"
   ],
+  "ashby_boards": [],
+  "smartrecruiters_companies": [
+    "Sutherland",
+    "Freshworks",
+    "ServiceNow"
+  ],
+  "workday_sites": [
+    "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+    "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site"
+  ],
+  "career_pages": [
+    "https://www.browserstack.com/careers",
+    "https://razorpay.com/jobs/",
+    "https://www.chargebee.com/careers/",
+    "https://www.postman.com/company/careers/"
+  ],
+  "remotive": {
+    "enabled": true,
+    "categories": [
+      "qa"
+    ],
+    "search": [
+      "test engineer",
+      "sdet"
+    ]
+  },
   "indeed": {
     "enabled": true,
     "query": "QA Engineer OR Test Engineer OR SDET",
@@ -30,7 +64,8 @@
       "Bangalore, Karnataka",
       "Chennai, Tamil Nadu"
     ],
-    "country_domain": "in.indeed.com"
+    "country_domain": "in.indeed.com",
+    "remote": true
   },
   "linkedin": {
     "enabled": true,
@@ -39,7 +74,9 @@
       "Bangalore, India",
       "Chennai, India"
     ],
-    "note": "Public unauthenticated search only. No login. Expect this to break or return partial results if LinkedIn changes markup or rate-limits the IP -- that is by design, not a bug to force past."
+    "note": "Public unauthenticated search only. No login. Expect this to break or return partial results if LinkedIn changes markup or rate-limits the IP -- that is by design, not a bug to force past.",
+    "remote": true,
+    "remote_location": "India"
   },
   "naukri": {
     "enabled": true,

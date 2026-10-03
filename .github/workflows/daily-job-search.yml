@@ -49,6 +49,15 @@ jobs:
           key: ats-memory-${{ github.run_id }}
           restore-keys: ats-memory-
 
+      # Career memory: which boards work, which are dead or login-only, and
+      # which jobs were already seen. Same cache pattern as the ATS memory.
+      - name: Restore career memory
+        uses: actions/cache@v4
+        with:
+          path: job-agent/output/career_memory.json
+          key: career-memory-${{ github.run_id }}
+          restore-keys: career-memory-
+
       - name: Cache the local model
         uses: actions/cache@v4
         with:

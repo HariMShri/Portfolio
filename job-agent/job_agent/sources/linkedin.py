@@ -16,8 +16,10 @@ HEADERS = {
 }
 
 
-def fetch(query: str, location: str, max_results: int = 25, timeout: int = 20) -> list[Job]:
+def fetch(query: str, location: str, max_results: int = 25, timeout: int = 20, remote: bool = False) -> list[Job]:
     url = SEARCH_URL.format(query=query.replace(" ", "%20"), location=location.replace(" ", "%20"))
+    if remote:
+        url += "&f_WT=2"  # LinkedIn's own "Remote" workplace filter
     try:
         resp = requests.get(url, headers=HEADERS, timeout=timeout)
         if resp.status_code != 200:
@@ -42,7 +44,7 @@ def fetch(query: str, location: str, max_results: int = 25, timeout: int = 20) -
         jobs.append(Job(
             title=title_el.get_text(strip=True),
             company=company_el.get_text(strip=True) if company_el else "Unknown",
-            location=location_el.get_text(strip=True) if location_el else "",
+            location=_location(location_el.get_text(strip=True) if location_el else "", location, remote),
             url=link_el["href"].split("?")[0] if link_el and link_el.get("href") else "",
             source="linkedin",
             description="",  # full description requires visiting the job page individually
@@ -51,3 +53,9 @@ def fetch(query: str, location: str, max_results: int = 25, timeout: int = 20) -
             break
 
     return jobs
+
+
+def _location(card_location: str, searched: str, remote: bool) -> str:
+    if not remote or "remote" in card_location.lower():
+        return card_location
+    return f"Remote ({card_location or searched})"

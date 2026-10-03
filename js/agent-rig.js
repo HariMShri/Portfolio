@@ -3,6 +3,14 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 /* The agent engineers and their character rig, shared by the office scene
    (agent-world.js) and the site-wide roaming layer (agent-roam.js). */
 
+// The Applicant runs on the candidate's own machine, not in the daily
+// workflow, so it roams the site but has no desk or status in the office.
+export const APPLICANT = {
+  id: 'applicant', name: 'Ravi Kumar', role: 'Applicant',
+  shirt: 0x4a6a8a, trousers: 0x2f343c, skin: 0xc9926b, hair: 0x231c1a,
+  accent: 0x7fd4b4, hairStyle: 'short', build: 1.02, wears: ['lanyard', 'glasses'], screen: 'mail',
+};
+
 export const AGENTS = [
   {
     id: 'role-scout', name: 'Mira Patel', role: 'Role Scout',

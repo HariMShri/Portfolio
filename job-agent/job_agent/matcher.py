@@ -2,8 +2,13 @@
 matching -- no AI call here, so this step is free and runs on every job
 before the (paid) drafting step only touches the shortlist that clears the bar.
 """
+import math
 import re
+from typing import Optional
+
+from .local_tailor import normalize, term_in_text
 from .models import Job
+from .remote import LABELS as REMOTE_LABELS, classify as classify_remote
 
 NEGATIVE_TITLE_WORDS = [
     "senior manager", "director", "vp ", "head of", "principal architect",
@@ -15,7 +20,7 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^a-z0-9\s]", " ", text.lower())
 
 
-def score_job(job: Job, profile: dict) -> Job:
+def score_job(job: Job, profile: dict, demand: Optional[dict] = None) -> Job:
     title_norm = _normalize(job.title)
     desc_norm = _normalize(job.description)
     combined = f"{title_norm} {desc_norm}"
@@ -47,20 +52,37 @@ def score_job(job: Job, profile: dict) -> Job:
         job.match_reasons = ["Title has no QA/testing signal -- excluded regardless of skill-keyword overlap"]
         return job
 
-    # Skill overlap in the description
-    matched_skills = [s for s in profile["skills"] if _normalize(s) in desc_norm]
+    # Skill overlap in the description. Whole-term matching, so "SQL" doesn't
+    # match inside "NoSQL" and "Java" doesn't match "JavaScript". Skills the
+    # market asks for more often (ATS memory) are worth more.
+    desc_tailor_norm = normalize(job.description)
+    matched_skills = [s for s in profile["skills"] if term_in_text(s, desc_tailor_norm)]
     if matched_skills:
-        skill_points = min(35, len(matched_skills) * 4)
+        skill_points = min(35, sum(_skill_weight(skill, demand) for skill in matched_skills))
         score += skill_points
         reasons.append(f"{len(matched_skills)} profile skills found in listing: {', '.join(matched_skills[:8])}")
 
-    # Location relevance
-    loc_norm = _normalize(job.location)
-    for target_loc in profile["target_locations"]:
-        if _normalize(target_loc) in loc_norm:
-            score += 15
-            reasons.append(f"Location matches \"{target_loc}\"")
-            break
+    # Location relevance. "Remote" only counts when the role is open to India.
+    job.work_mode = classify_remote(job.location, job.title)
+    if job.work_mode in ("remote_restricted", "abroad"):
+        job.match_score = 0.0
+        job.match_reasons = reasons + [REMOTE_LABELS[job.work_mode] + " -- excluded"]
+        return job
+    if job.work_mode == "remote_open":
+        score += 15
+        reasons.append(REMOTE_LABELS["remote_open"])
+    elif job.work_mode == "remote_unspecified":
+        score += 8
+        reasons.append(REMOTE_LABELS["remote_unspecified"])
+    else:
+        loc_norm = _normalize(job.location)
+        for target_loc in profile["target_locations"]:
+            if _normalize(target_loc) == "remote":
+                continue
+            if _normalize(target_loc) in loc_norm:
+                score += 15
+                reasons.append(f"Location matches \"{target_loc}\"")
+                break
 
     # Seniority sanity check -- penalize obviously mismatched senior/leadership titles
     if any(neg in title_norm for neg in NEGATIVE_TITLE_WORDS):
@@ -78,6 +100,18 @@ def score_job(job: Job, profile: dict) -> Job:
     return job
 
 
+def _skill_weight(skill: str, demand: Optional[dict]) -> float:
+    """4 points per matched skill, scaled from 3 (rarely asked for) to 6
+    (asked for in most listings) once the ATS memory has seen enough data."""
+    if not demand:
+        return 4.0
+    peak = max(demand.values(), default=0)
+    if peak < 20:
+        return 4.0
+    share = demand.get(normalize(skill).strip(), 0) / peak
+    return 3.0 + 3.0 * math.sqrt(share)
+
+
 def _extract_years_required(text: str) -> int | None:
     matches = re.findall(r"(\d{1,2})\s*\+?\s*years", text)
     if not matches:
@@ -85,8 +119,8 @@ def _extract_years_required(text: str) -> int | None:
     return max(int(m) for m in matches)
 
 
-def score_and_filter(jobs: list[Job], profile: dict, min_score: float) -> list[Job]:
-    scored = [score_job(j, profile) for j in jobs]
+def score_and_filter(jobs: list[Job], profile: dict, min_score: float, demand: Optional[dict] = None) -> list[Job]:
+    scored = [score_job(j, profile, demand) for j in jobs]
     seen = set()
     deduped = []
     for j in sorted(scored, key=lambda x: x.match_score, reverse=True):

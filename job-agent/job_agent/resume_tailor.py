@@ -8,7 +8,7 @@ cannot wander, rather than a model that could.
 """
 from typing import Optional
 
-from .local_tailor import select_evidence
+from .local_tailor import normalize, select_evidence, term_in_text
 from .models import Job
 
 
@@ -73,11 +73,30 @@ def validate_resume_plan(plan: object, profile: dict) -> tuple[Optional[dict], l
     return {"experience": safe_experience, "skills": skills}, []
 
 
+def fit_gap(job: Job, profile: dict, demand: Optional[dict] = None) -> dict:
+    """The skills this listing asks for, split into ones the profile can back
+    and ones it can't, most in-demand first. The missing list is what to learn
+    or to address honestly -- it is never added to the resume."""
+    from .ats_memory import vocabulary
+
+    job_norm = normalize(f"{job.title} {job.description}")
+    evidence_norm = normalize(" ".join(
+        [" ".join(profile.get("skills", [])), profile.get("summary", "")]
+        + [" ".join(entry.get("highlights", [])) for entry in profile.get("experience", [])]
+    ))
+    asked = [term for term in vocabulary(profile) if term_in_text(term, job_norm)]
+    asked.sort(key=lambda term: (-(demand or {}).get(term, 0), term))
+    covered = [term for term in asked if term_in_text(term, evidence_norm)]
+    missing = [term for term in asked if term not in covered]
+    return {"covered": covered[:15], "missing": missing[:10]}
+
+
 def tailor_resume_for_job(job: Job, profile: dict, demand: Optional[dict] = None) -> Job:
     plan = select_evidence(job, profile, demand)
     safe_plan, issues = validate_resume_plan(plan, profile)
     job.draft_resume = safe_plan
     job.resume_review = {"passed": not issues, "issues": issues}
+    job.fit_gap = fit_gap(job, profile, demand)
     return job
 
 

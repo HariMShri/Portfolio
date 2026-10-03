@@ -3,3 +3,4 @@ output/
 __pycache__/
 *.pyc
 manual_jobs.json
+application_answers.json

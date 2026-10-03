@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {
-  AGENTS, box, cylinder, sphere, torus, plane, material, mesh,
+  AGENTS, APPLICANT, box, cylinder, sphere, torus, plane, material, mesh,
   createPerson, POSE, approach, applyPose, walkPose,
 } from './agent-rig.js';
 
@@ -120,6 +120,14 @@ const TASKS = {
     anim: 'carry', carry: true, spots: ['.ai-work__card', '.agent-world__heading', '.edu-card'],
     lines: ['Shipping a release build', 'Moving tested builds to staging'],
   },
+  apply: {
+    anim: 'laptop', sit: true, spots: ['.contact__form', '.ai-work__card', '.timeline__content'],
+    lines: ['Filling a Greenhouse form, you approve first', 'Attaching your tailored resume', 'Left the custom questions for you'],
+  },
+  answers: {
+    anim: 'clipboard', spots: ['.contact__item', '.about__card', '.edu-card'],
+    lines: ['Only answering questions you answered', 'No logins, ever: that part is yours'],
+  },
   // Shared tasks any engineer picks up between their own.
   coffee: {
     anim: 'coffee', sit: true, spots: ['.section__eyebrow', '.edu-card', '.hero__stat', '.contact__item', '.skill-card'],
@@ -148,6 +156,7 @@ const ROSTER = {
   'application-reviewer': ['review', 'review', 'a11y', 'regress'],
   'application-coordinator': ['deliver', 'deploy', 'shortlist'],
   'feedback-analyst': ['track', 'track', 'match', 'a11y'],
+  applicant: ['apply', 'apply', 'answers', 'deliver'],
 };
 const SHARED = ['coffee', 'wave', 'polish'];
 
@@ -159,6 +168,7 @@ const HANDOFF_LINES = {
   'application-reviewer': (to) => `Approved, over to you, ${to}`,
   'application-coordinator': (to) => `Your next batch, ${to}`,
   'feedback-analyst': (to) => `This week's trends, ${to}`,
+  applicant: (to) => `Application filed, ${to}`,
 };
 
 /* ---------- props ---------- */
@@ -349,7 +359,7 @@ layer.append(bubbleLayer);
 let liveCounts = null;
 const liveStatus = new Map();
 
-const roamers = AGENTS.map((agent, index) => {
+const roamers = [...AGENTS, APPLICANT].map((agent, index) => {
   const holder = new THREE.Group();
   agentsLayer.add(holder);
   const rig = createPerson(agent, holder);
@@ -393,7 +403,7 @@ const roamers = AGENTS.map((agent, index) => {
 
 function openInOffice(id) {
   const figure = document.querySelector(`.agent-figure[data-agent="${id}"]`);
-  const network = document.getElementById('agentNetwork');
+  const network = figure ? document.getElementById('agentNetwork') : document.getElementById('ai-work');
   if (network) network.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'center' });
   if (figure) figure.click();
 }

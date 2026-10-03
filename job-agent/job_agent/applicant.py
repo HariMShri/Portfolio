@@ -41,7 +41,10 @@ NO_AUTOMATION_REASON = {
     "linkedin": "LinkedIn prohibits automated applications",
     "indeed": "Indeed prohibits automated applications",
     "naukri": "Naukri prohibits automated applications",
+    "workday": "Workday applications need a candidate account, and the agent never logs in for you",
+    "remotive": "Remotive links out to each employer's own application page",
 }
+ANSWERS_FILENAME = "application_answers.json"
 
 CONFIRMATION_PATTERN = re.compile(
     r"thank you for (applying|your application|your interest)|application (has been |was )?(submitted|received)"
@@ -159,9 +162,15 @@ def job_from_dict(data: dict) -> Job:
     return Job(**{key: value for key, value in data.items() if key in known})
 
 
-def _usable_cover_note(job: Job) -> str:
+def _usable_cover_note(job: Job, profile: dict) -> str:
+    """Only a note that passed the Application Reviewer's fact check is sent."""
+    from .reviewer import review_cover_note
+
     note = (job.draft_cover_note or "").strip()
-    return "" if not note or note.startswith("[Drafting failed") else note
+    if not note or note.startswith("[Drafting failed"):
+        return ""
+    review = job.cover_review or review_cover_note(job, profile)
+    return note if review.get("passed") else ""
 
 
 def render_cover_letter_pdf(job: Job, profile: dict, note: str, out_path: str) -> None:
@@ -214,7 +223,7 @@ def build_package(job_data: dict, profile: dict, output_dir: str = "output",
     owner = _owner(profile)
     files = {"resume": os.path.join(folder, f"{owner}_Resume.pdf")}
     render_resume_pdf(job, profile, files["resume"])
-    note = _usable_cover_note(job) if include_cover_letter else ""
+    note = _usable_cover_note(job, profile) if include_cover_letter else ""
     if note:
         files["cover_letter"] = os.path.join(folder, f"{owner}_Cover_Letter.pdf")
         render_cover_letter_pdf(job, profile, note, files["cover_letter"])
@@ -440,7 +449,54 @@ def _fill_labelled_links(page, profile: dict) -> None:
             continue
 
 
-def fill_form(page, package: Package, profile: dict) -> list[str]:
+def load_answers(path: str = ANSWERS_FILENAME) -> list[dict]:
+    """Your own answers to questions employers repeat (notice period, work
+    authorisation, relocation...). Kept in a gitignored file because the repo
+    is public. Each entry: {"question": "<regex matched against the field
+    label>", "answer": "<exact text or option to choose>"}."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    entries = data.get("answers", []) if isinstance(data, dict) else data
+    return [e for e in entries if isinstance(e, dict) and e.get("question") and e.get("answer")]
+
+
+def _fill_answer_bank(page, answers: list[dict]) -> list[str]:
+    """Answer only questions you have answered yourself, matched by label."""
+    answered = []
+    for entry in answers:
+        try:
+            fields_found = page.get_by_label(re.compile(entry["question"], re.I))
+            for index in range(fields_found.count()):
+                item = fields_found.nth(index)
+                if not item.is_visible() or not item.is_enabled():
+                    continue
+                tag = item.evaluate("el => el.tagName.toLowerCase()")
+                kind = (item.get_attribute("type") or "").lower()
+                if tag == "select":
+                    if not item.input_value():
+                        item.select_option(label=str(entry["answer"]))
+                        answered.append(entry["question"])
+                elif tag == "textarea" or kind in ("", "text", "number", "url", "tel"):
+                    if not item.input_value().strip():
+                        item.fill(str(entry["answer"]))
+                        answered.append(entry["question"])
+                elif kind in ("radio", "checkbox"):
+                    continue
+        except Exception:
+            continue
+    return answered
+
+
+LOGIN_WALL_JS = """
+() => Array.from(document.querySelectorAll("input[type='password']"))
+  .some((el) => el.offsetWidth > 0 || el.offsetHeight > 0)
+"""
+
+
+def fill_form(page, package: Package, profile: dict, answers: Optional[list] = None) -> list[str]:
     """Enter profile facts and attach the approved files. Returns what was filled."""
     platform = package.destination["platform"]
     selectors = FIELD_SELECTORS[platform]
@@ -466,6 +522,7 @@ def fill_form(page, package: Package, profile: dict) -> list[str]:
         filled.append("resume")
     if "cover_letter" in selectors and _upload(page, selectors["cover_letter"], package.files.get("cover_letter")):
         filled.append("cover_letter")
+    filled += [f"answer:{question}" for question in _fill_answer_bank(page, answers or [])]
     return filled
 
 
@@ -478,10 +535,15 @@ def _confirmed(page) -> bool:
         return False
 
 
-def apply_in_page(page, package: Package, profile: dict, scope: str, confirm_timeout: float = 25.0) -> Attempt:
+def apply_in_page(page, package: Package, profile: dict, scope: str, confirm_timeout: float = 25.0,
+                  answers: Optional[list] = None) -> Attempt:
     """Fill the open form; submit only for scope 'submit' with nothing left to a human."""
     platform = package.destination["platform"]
-    filled = fill_form(page, package, profile)
+    # A login wall is the user's to pass, never the agent's.
+    if page.evaluate(LOGIN_WALL_JS):
+        return Attempt(package.job_id, platform, "login_required",
+                       "the form asks you to sign in -- the agent never logs in for you", ["Sign in"])
+    filled = fill_form(page, package, profile, answers)
     if "resume" not in filled:
         return Attempt(package.job_id, platform, "needs_you", "couldn't find the resume upload field",
                        ["Resume upload"])

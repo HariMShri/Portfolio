@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to application_answers.json (gitignored) and fill in YOUR answers. Each 'question' is a regular expression matched against a form field's label; the Applicant fills that field only when it is empty. Anything not covered here is left for you in the browser.",
+  "answers": [
+    {"question": "notice period", "answer": "30 days"},
+    {"question": "(legally )?(authori[sz]ed|eligible) to work in india", "answer": "Yes"},
+    {"question": "require (visa )?sponsorship", "answer": "No"},
+    {"question": "willing to relocate", "answer": "Yes"},
+    {"question": "total (years of )?experience", "answer": "5"},
+    {"question": "how did you hear", "answer": "Company careers page"}
+  ]
+}

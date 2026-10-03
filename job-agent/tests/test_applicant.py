@@ -171,6 +171,33 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(values["last_name"], "Name")
         self.assertEqual(values["q1"], PROFILE["linkedin_url"])
 
+    def test_answer_bank_answers_only_your_questions(self):
+        extra = ('<label for="q2">Notice period*</label><input id="q2" required>'
+                 '<label for="q3">Expected salary*</label><input id="q3" required>')
+        with TemporaryDirectory() as out:
+            package = applicant.build_package(job_dict(), PROFILE, out)
+            page = self.browser.new_page()
+            page.set_content(GREENHOUSE_FORM.format(extra=extra))
+            attempt = applicant.apply_in_page(page, package, PROFILE, "submit", confirm_timeout=5,
+                                              answers=[{"question": "notice period", "answer": "30 days"}])
+            notice = page.evaluate("document.getElementById('q2').value")
+            page.close()
+        self.assertEqual(notice, "30 days")
+        self.assertEqual(attempt.status, "needs_you")
+        self.assertEqual(attempt.blockers, ["Expected salary"])
+
+    def test_login_wall_is_never_entered(self):
+        with TemporaryDirectory() as out:
+            package = applicant.build_package(job_dict(), PROFILE, out)
+            page = self.browser.new_page()
+            page.set_content('<form><label for="u">Email</label><input id="u">'
+                             '<label for="p">Password</label><input id="p" type="password"></form>')
+            attempt = applicant.apply_in_page(page, package, PROFILE, "submit", confirm_timeout=5)
+            typed = page.evaluate("document.getElementById('u').value")
+            page.close()
+        self.assertEqual(attempt.status, "login_required")
+        self.assertEqual(typed, "")
+
     def test_custom_required_question_is_left_to_the_user(self):
         extra = '<label for="q2">Are you legally authorised to work here?*</label><select id="q2" required>' \
                 '<option value=""></option><option>Yes</option></select>'

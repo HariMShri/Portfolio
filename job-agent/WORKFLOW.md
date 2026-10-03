@@ -78,3 +78,7 @@ The job-agent sends snapshots to an authenticated worker write route. The worker
 - Monitor run freshness, source health, stage counts, failure rates, latency, draft-review return rates, and cost. Keep personal data out of metric labels.
 - Test malformed handoffs, unsupported claims, duplicate listings, source outages, invalid/expired approval, failed review loops, replayed updates, interrupted runs, redaction, and unavailable public status.
 - Scale source collection, fit evaluation, drafting, and review independently behind a durable queue when volume justifies it. Preserve per-job ordering and idempotency; use dead-letter records and replay controls for exhausted tasks.
+
+## Sources, memory and logins
+
+Role Scout reads company job boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) through their public candidate feeds, resolves company careers pages to those boards (or schema.org `JobPosting` data), and searches remote roles. `job_agent/career_memory.py` keeps per-board status and yield, careers-page resolutions, hashed seen-job IDs and per-platform apply routes in the Actions cache; boards that fail repeatedly are parked and retried later. No agent ever signs in to any account, stores a password, or attempts to pass a login or CAPTCHA: login-only careers pages are recorded as `login_required` and skipped, Workday applications are always left to the user, and a sign-in screen during an application ends the attempt with `login_required`.

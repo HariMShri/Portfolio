@@ -21,12 +21,13 @@ from job_agent.drafter import draft_shortlist
 from job_agent.report import write_report
 from job_agent.notifier import send_digest
 from job_agent.resume_tailor import tailor_shortlist
-from job_agent.reviewer import review_resume_drafts
+from job_agent.reviewer import review_cover_notes, review_resume_drafts
 from job_agent.feedback_analyst import run_feedback_analysis
 from job_agent import ats_memory
 from job_agent.local_llm import available_models, wait_until_ready
 from job_agent.status import StatusPublisher
-from job_agent.sources import greenhouse, lever, indeed, linkedin, naukri, manual
+from job_agent.sources import careers, indeed, linkedin, naukri, manual, remotive
+from job_agent import applicant, career_memory
 
 
 def load_json(path: str) -> dict:
@@ -34,44 +35,104 @@ def load_json(path: str) -> dict:
         return json.load(f)
 
 
-def collect_jobs(config: dict) -> list[Job]:
+def board_sites(config: dict) -> list[dict]:
+    """Every ATS board to read this run: the configured boards plus whatever
+    the company careers pages resolve to."""
+    sites = [{"platform": "greenhouse", "token": token} for token in config.get("greenhouse_boards", [])]
+    sites += [{"platform": "lever", "token": token} for token in config.get("lever_boards", [])]
+    sites += [{"platform": "ashby", "token": token} for token in config.get("ashby_boards", [])]
+    sites += [{"platform": "smartrecruiters", "token": token} for token in config.get("smartrecruiters_companies", [])]
+    sites += [{"platform": "workday", "token": url} for url in config.get("workday_sites", [])]
+    return sites
+
+
+def resolve_career_pages(config: dict, memory: dict) -> list[dict]:
+    sites = []
+    for url in config.get("career_pages", []):
+        resolution = career_memory.cached_resolution(memory, url)
+        if resolution is None:
+            resolution = careers.resolve(url)
+            career_memory.remember_resolution(memory, url, resolution)
+            print(f"  [careers] {url} -> {resolution.get('platform') or resolution['status']}")
+        if resolution.get("platform"):
+            sites.append({"platform": resolution["platform"], "token": resolution["token"]})
+        else:
+            # Login-only or unreadable careers pages are remembered and skipped, never logged into.
+            career_memory.record_visit(memory, career_memory.site_key("careers", url), resolution["status"], 0)
+    return sites
+
+
+def collect_jobs(config: dict, memory: dict) -> list[Job]:
     jobs: list[Job] = []
 
-    print("Searching Greenhouse boards...")
-    for board in config.get("greenhouse_boards", []):
-        found = greenhouse.fetch(board)
-        print(f"  [greenhouse:{board}] {len(found)} jobs")
+    print("Reading company job boards and careers pages...")
+    sites = board_sites(config) + resolve_career_pages(config, memory)
+    seen_keys = set()
+    for site in sites:
+        key = career_memory.site_key(site["platform"], site["token"])
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        reason = career_memory.parked(memory, key)
+        if reason:
+            print(f"  [{key}] skipped: {reason}")
+            continue
+        found, status = careers.fetch_site(site)
+        career_memory.record_visit(memory, key, status, len(found))
+        for job in found:
+            job.site = key
+        print(f"  [{key}] {len(found)} jobs" + ("" if status in ("ok", "empty") else f" ({status})"))
         jobs.extend(found)
 
-    print("Searching Lever boards...")
-    for board in config.get("lever_boards", []):
-        found = lever.fetch(board)
-        print(f"  [lever:{board}] {len(found)} jobs")
-        jobs.extend(found)
+    remotive_cfg = config.get("remotive", {})
+    if remotive_cfg.get("enabled"):
+        print("Searching remote roles (Remotive)...")
+        for category in remotive_cfg.get("categories", []):
+            found = remotive.fetch(category=category)
+            print(f"  [remotive:{category}] {len(found)} jobs")
+            jobs.extend(found)
+        for term in remotive_cfg.get("search", []):
+            found = remotive.fetch(search=term)
+            print(f"  [remotive:'{term}'] {len(found)} jobs")
+            jobs.extend(found)
 
     indeed_cfg = config.get("indeed", {})
     if indeed_cfg.get("enabled"):
         print("Searching Indeed (via headless browser -- may take ~15s per location)...")
-        for loc in indeed_cfg.get("locations", []):
+        locations = list(indeed_cfg.get("locations", []))
+        if indeed_cfg.get("remote"):
+            locations.append("Remote")
+        for loc in locations:
             found = indeed.fetch(
                 query=indeed_cfg.get("query", "QA Engineer"),
                 location=loc,
                 domain=indeed_cfg.get("country_domain", "in.indeed.com"),
                 max_results=config.get("max_results_per_source", 25),
             )
+            if loc == "Remote":
+                # Indeed India's remote results are remote within India.
+                for job in found:
+                    if "remote" in job.location.lower() and "india" not in job.location.lower():
+                        job.location = f"{job.location} (India)"
+                    elif "remote" not in job.location.lower():
+                        job.location = f"Remote ({job.location or 'India'})"
             print(f"  [indeed:{loc}] {len(found)} jobs")
             jobs.extend(found)
 
     linkedin_cfg = config.get("linkedin", {})
     if linkedin_cfg.get("enabled"):
         print("Searching LinkedIn (public search, unauthenticated)...")
-        for loc in linkedin_cfg.get("locations", []):
+        searches = [(loc, False) for loc in linkedin_cfg.get("locations", [])]
+        if linkedin_cfg.get("remote"):
+            searches.append((linkedin_cfg.get("remote_location", "India"), True))
+        for loc, remote_only in searches:
             found = linkedin.fetch(
                 query=linkedin_cfg.get("query", "QA Engineer"),
                 location=loc,
                 max_results=config.get("max_results_per_source", 25),
+                remote=remote_only,
             )
-            print(f"  [linkedin:{loc}] {len(found)} jobs")
+            print(f"  [linkedin:{loc}{' remote' if remote_only else ''}] {len(found)} jobs")
             jobs.extend(found)
 
     naukri_cfg = config.get("naukri", {})
@@ -91,21 +152,49 @@ def collect_jobs(config: dict) -> list[Job]:
     return jobs
 
 
+def pick_material_jobs(shortlist: list[Job], limit: int, prefer_auto_apply: bool) -> list[Job]:
+    """Which jobs get a tailored resume and cover note. With prefer_auto_apply,
+    jobs the Applicant can submit (Greenhouse/Lever forms) go first, so the
+    drafts land where they can actually be used; then new jobs; then score."""
+    if not prefer_auto_apply:
+        return shortlist[:limit]
+    ranked = sorted(shortlist, key=lambda job: (
+        applicant.destination_for(job.to_dict()) is None, not job.is_new, -job.match_score,
+    ))
+    return ranked[:limit]
+
+
 def main():
     status = StatusPublisher()
     profile = load_json("profile.json")
     config = load_json("config.json")
 
     status.publish("role-scout", "running")
-    all_jobs = collect_jobs(config)
+    sites_memory = career_memory.load("output")
+    all_jobs = collect_jobs(config, sites_memory)
     print(f"\nTotal jobs fetched (before scoring/dedup): {len(all_jobs)}")
     status.publish("fit-analyst", "running", discovered=len(all_jobs))
 
-    shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35))
+    # Score with what earlier runs learned about skill demand.
+    prior_demand = ats_memory.demand(ats_memory.load("output"))
+    shortlist = score_and_filter(all_jobs, profile, config.get("min_match_score", 35), prior_demand)
     print(f"Shortlist after scoring/dedup (>= {config.get('min_match_score', 35)} match): {len(shortlist)}")
+    remote_count = sum(job.work_mode.startswith("remote") for job in shortlist)
+    new_count = career_memory.mark_new(sites_memory, shortlist)
+    career_memory.record_shortlisted(sites_memory, shortlist)
+    sites_memory["runs"] = sites_memory.get("runs", 0) + 1
+    career_memory.save("output", sites_memory)
+    print(f"  {new_count} new since earlier runs, {remote_count} remote")
+    print(f"  [career-memory] {career_memory.summarize(sites_memory)}")
+    site_summary = career_memory.site_report(sites_memory)
+    if site_summary["productive"]:
+        print("  [career-memory] most productive: "
+              + ", ".join(f"{key} ({count})" for key, count in site_summary["productive"][:8]))
+    if site_summary["parked"]:
+        print("  [career-memory] parked: " + ", ".join(site_summary["parked"]))
 
     material_limit = max(0, int(config.get("max_ai_jobs_per_run", 3)))
-    material_jobs = shortlist[:material_limit]
+    material_jobs = pick_material_jobs(shortlist, material_limit, config.get("prefer_auto_apply", True))
     if len(material_jobs) < len(shortlist):
         print(
             f"Writing application materials for the top {len(material_jobs)} shortlisted jobs "
@@ -157,6 +246,10 @@ def main():
         shortlisted=len(shortlist), resumes_tailored=resumes_tailored,
     )
     resumes_reviewed = review_resume_drafts(material_jobs, profile)
+    notes_drafted = sum(job.draft_cover_note is not None for job in material_jobs)
+    notes_passed = review_cover_notes(material_jobs, profile)
+    if notes_drafted:
+        print(f"  [reviewer] {notes_passed}/{notes_drafted} cover notes passed the fact check")
     resumes_tailored = resumes_reviewed
     status.publish(
         "application-reviewer", "running", discovered=len(all_jobs),

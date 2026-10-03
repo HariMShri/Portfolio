@@ -44,7 +44,7 @@ Company: {company}
 Location: {location}
 Description:
 {description}
-{keyword_hint}
+{keyword_hint}{style_hint}
 Write:
 1. A short cover note (120-180 words) tailored to this specific job, grounded only \
 in the candidate's real profile above.
@@ -93,6 +93,18 @@ def keyword_hint(job: Job, profile: dict, demand=None) -> str:
     )
 
 
+def style_hint(profile: dict) -> str:
+    """profile.json may hold a short "writing_sample" in the candidate's own
+    words. It steers tone only; facts still come from the profile."""
+    sample = (profile.get("writing_sample") or "").strip()
+    if not sample:
+        return ""
+    return (
+        "\nSTYLE SAMPLE written by the candidate -- match its tone, sentence length and plainness, "
+        f"but take no facts from it:\n<<<\n{sample[:1200]}\n>>>\n"
+    )
+
+
 def draft_for_job(job: Job, profile: dict, model: str, demand=None) -> Job:
     profile_evidence = {key: profile[key] for key in PROFILE_EVIDENCE_FIELDS if key in profile}
     prompt = USER_PROMPT_TEMPLATE.format(
@@ -102,6 +114,7 @@ def draft_for_job(job: Job, profile: dict, model: str, demand=None) -> Job:
         location=job.location,
         description=job.description[:4000] or "(no description available -- draft from title/company alone and flag that in the cover note)",
         keyword_hint=keyword_hint(job, profile, demand),
+        style_hint=style_hint(profile),
     )
     parsed, error = generate_json(prompt, SYSTEM_PROMPT, model, "drafter", RESPONSE_SCHEMA)
     if error is not None:

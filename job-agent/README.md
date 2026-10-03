@@ -131,6 +131,49 @@ drafts are built by selecting and ordering exact highlights and skills from
 `profile.json`; the source PDF is left unchanged. All output is gitignored and
 never committed.
 
+## Where jobs come from (Role Scout)
+
+- **Company job boards** (`greenhouse_boards`, `lever_boards`, `ashby_boards`,
+  `smartrecruiters_companies`, `workday_sites` in `config.json`): each
+  board's public JSON feed for candidates.
+- **Company careers pages** (`career_pages`): the agent works out which
+  system the page uses -- from links in the page, one hop to its "open roles"
+  page, or the requests the page makes when rendered -- and reads that feed.
+  Pages with schema.org `JobPosting` data are read directly. robots.txt is
+  honoured. Pages behind a login are reported and skipped: the agent never
+  signs in to any account.
+- **Remote roles**: Remotive's public API, LinkedIn's remote filter and
+  Indeed India's remote search. The Fit Analyst only keeps remote roles open
+  to candidates in India (`job_agent/remote.py`); "Remote -- US only" and
+  onsite roles abroad are excluded.
+- LinkedIn, Indeed and Naukri public searches as before.
+
+### Career memory
+
+`output/career_memory.json` (Actions cache in CI, never committed) remembers
+each board's last status and yield. A board that 404s twice is parked for a
+week and one behind a login for a month, so runs stop wasting time on them;
+the run log lists the most productive and the parked boards. It also
+remembers which careers page uses which system, which jobs were already
+seen (so the email and report mark **NEW** jobs and list them first), and
+what applying on each platform has needed. Only board IDs from config,
+hashed job IDs, dates and counts are stored.
+
+### What changed in scoring and drafting
+
+- Skills match as whole terms ("SQL" no longer matches "NoSQL"), weighted by
+  how often the market asks for them once the ATS memory has enough data.
+- Tailored materials go first to jobs the Applicant can submit
+  (`prefer_auto_apply`), then to new jobs, then by score.
+- Each resume PDF is kept to one page by dropping the least relevant
+  highlights; the report lists the skills each job asks for that you have and
+  the ones you don't (never added to the resume).
+- The Application Reviewer fact-checks every cover note: any number, tool or
+  employer not in `profile.json` fails it, the report flags it, and the
+  Applicant won't send it. Mentioning a skill you're *learning* is fine.
+- Optional `writing_sample` in `profile.json`: a paragraph in your own words
+  that the Application Writer matches for tone (never for facts).
+
 ## Applying on your behalf (Applicant)
 
 ```
@@ -154,6 +197,13 @@ required field is left: employer-specific questions (work authorisation,
 notice period, salary, demographics) and CAPTCHAs are always left for you to
 answer in that window. A confirmed submission is recorded as `applied` for
 Feedback Analyst; attempts are logged to `output/applications.jsonl`.
+
+**Answer bank.** Copy `application_answers.example.json` to
+`application_answers.json` (gitignored -- the repo is public) and write your
+own answers to questions employers repeat. The Applicant fills a field only
+when its label matches one of your questions and the field is empty; every
+other question still comes back to you. If a form shows a sign-in page the
+Applicant stops and hands it to you; it never logs in to any account.
 
 Only Greenhouse and Lever forms are automated. LinkedIn, Indeed and Naukri
 prohibit automated applications (accounts get banned), so for those jobs the

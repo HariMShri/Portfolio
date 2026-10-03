@@ -18,18 +18,25 @@ def _summary_html(jobs: list[Job], profile: dict) -> str:
         <p>This is expected on plenty of days; it's a signal the filter is being honest
         rather than padding the list.</p>
         """
-    top = jobs[:8]
+    import html as html_lib
+
+    # New jobs first, then by score -- yesterday's matches are already in yesterday's email.
+    top = sorted(jobs, key=lambda j: (not j.is_new, -j.match_score))[:10]
     rows = []
     for j in top:
-        link_html = f' &mdash; <a href="{j.url}">listing</a>' if j.url else ""
+        link_html = f' &mdash; <a href="{html_lib.escape(j.url)}">listing</a>' if j.url else ""
+        tags = "".join(f' <span style="color:#1e7d32;font-weight:700">{tag}</span>' for tag in (
+            "NEW" if j.is_new else "", "REMOTE" if j.work_mode.startswith("remote") else "") if tag)
         rows.append(
-            f'<li style="margin-bottom:8px"><strong>{j.title}</strong> at {j.company} '
-            f'&mdash; {j.location} ({j.match_score:.0f} match){link_html}</li>'
+            f'<li style="margin-bottom:8px"><strong>{html_lib.escape(j.title)}</strong> at {html_lib.escape(j.company)}'
+            f'{tags} &mdash; {html_lib.escape(j.location)} ({j.match_score:.0f} match){link_html}</li>'
         )
     rows = "".join(rows)
     more = f"<p>...and {len(jobs) - len(top)} more in the attached full report.</p>" if len(jobs) > len(top) else ""
+    new_count = sum(j.is_new for j in jobs)
+    remote_count = sum(j.work_mode.startswith("remote") for j in jobs)
     return f"""
-    <p>{len(jobs)} job(s) matched today. Top ones:</p>
+    <p>{len(jobs)} job(s) matched today &mdash; {new_count} new, {remote_count} remote. Top ones:</p>
     <ul>{rows}</ul>
     {more}
     <p>Full drafted cover notes and Q&amp;A are in the attached PDF report, and each
