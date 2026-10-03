@@ -142,7 +142,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
       const selectedCard = document.querySelector('.agent-figure[aria-pressed="true"]');
       if (selectedCard) selectAgentCard(selectedCard.dataset.agent, false);
       window.dispatchEvent(new CustomEvent('agent-status-update', {
-        detail: { agents: data.agents, run_status: data.run_status, runtime: data.runtime },
+        detail: { agents: data.agents, run_status: data.run_status, runtime: data.runtime, counts: data.counts },
       }));
       const noMaterials = data.run_status === 'completed'
         && data.counts.shortlisted > 0
@@ -170,6 +170,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
             })),
             run_status: data.run_status,
             runtime: data.runtime,
+            counts: data.counts,
           },
         }));
       } else {
