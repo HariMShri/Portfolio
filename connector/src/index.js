@@ -118,6 +118,19 @@ const defaultHandler = {
       }
       if (url.pathname === "/dashboard/login") return await auth.startDashboardLogin(request, env);
       if (url.pathname === "/logout") return auth.logout();
+      if (url.pathname === "/health") {
+        // Reports only whether the database answers; no data, no details.
+        let database = "unreachable";
+        try {
+          await neon(env.DATABASE_URL).query("select 1", []);
+          database = "ok";
+        } catch {
+          // fall through
+        }
+        return new Response(JSON.stringify({ database, sign_in_configured: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET && env.COOKIE_SECRET) }), {
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
       if (url.pathname === "/dashboard" || url.pathname.startsWith("/dashboard/api/")) {
         const login = await auth.sessionLogin(request, env);
         if (!login) {
