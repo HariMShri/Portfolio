@@ -23,7 +23,7 @@
       //   npx wrangler kv namespace create OAUTH_KV
       // and paste the id here.
       "binding": "OAUTH_KV",
-      "id": "REPLACE_WITH_OAUTH_KV_ID"
+      "id": "f2d4e2b275bc47e98afb3d444011a0bb"
     }
   ],
   "observability": { "enabled": true }
