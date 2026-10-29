@@ -93,5 +93,11 @@
     "from_email": "Job Search Agent <onboarding@resend.dev>",
     "always_send": true
   },
+  "notify": {
+    "enabled": true,
+    "to_email": "krithika47437@gmail.com",
+    "from_email": "Job Search Agent <onboarding@resend.dev>",
+    "always_send": true
+  },
   "local_model": "llama3.2:3b"
 }
