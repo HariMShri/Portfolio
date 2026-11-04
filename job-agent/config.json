@@ -89,7 +89,10 @@
   },
   "notify": {
   "enabled": true,
-  "to_email": "m.shrihari04@gmail.com",
+  "to_email": [
+    "m.shrihari04@gmail.com",
+    "krithika47437@gmail.com",
+  ],
   "from_email": "Job Search Agent <onboarding@resend.dev>",
   "always_send": true
   },
