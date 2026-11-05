@@ -40,8 +40,9 @@ which can hurt more than help. So this agent:
 The digest email goes out through Brevo's transactional email API
 (app.brevo.com, free tier: 300 emails/day). In **github.com/HariMShri/Portfolio
 → Settings → Secrets and variables → Actions** (never commit keys to the
-repo), add the secret `BREVO_API_KEY` — Brevo → SMTP & API → API Keys
-(starts with `xkeysib-`).
+repo), add the secret `SMTP_KEY` — Brevo → SMTP & API → SMTP tab → SMTP key —
+and put that tab's Login in `config.json` → `notify.smtp_login`. If SMTP isn't
+set up, the secret `BREVO_API_KEY` (API Keys tab, `xkeysib-…`) is used instead.
 
 `config.json` → `notify.from_email` must be a sender verified in Brevo
 (Senders, domains & dedicated IPs → Senders). `notify.to_email` is you —

@@ -259,6 +259,33 @@ class ResumePlanValidationTests(unittest.TestCase):
             self.assertNotIn("example.invalid/s", shared["htmlContent"])
             self.assertTrue(any(a["name"].startswith("job_report") for a in shared["attachment"]))
 
+    def test_smtp_is_used_when_smtp_key_and_login_are_set(self):
+        from job_agent.notifier import send_digest
+
+        profile = {"name": "Candidate Name", "email": "candidate@example.invalid", "summary": "s",
+                   "experience": [], "education": [], "certifications": []}
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+        config = {"notify": {"enabled": True, "to_email": "owner@example.invalid",
+                             "share_with": ["a@example.invalid"], "smtp_login": "login@smtp.invalid",
+                             "from_email": "Agent <sender@example.invalid>"}}
+        links = {job.job_id: {"submit": "https://example.invalid/s", "fill": "https://example.invalid/f",
+                              "skip": "https://example.invalid/k"}}
+
+        with TemporaryDirectory() as output_dir:
+            _, pdf_path, _ = write_report([job], profile, output_dir)
+            with patch.dict(os.environ, {"SMTP_KEY": "smtp-key", "BREVO_API_KEY": "api-key"}),                     patch("smtplib.SMTP") as smtp, patch("requests.post") as post:
+                self.assertTrue(send_digest([job], profile, config, pdf_path, approval_links=links))
+
+        post.assert_not_called()
+        server = smtp.return_value.__enter__.return_value
+        server.login.assert_called_once_with("login@smtp.invalid", "smtp-key")
+        owner_msg, shared_msg = (c.args[0] for c in server.send_message.call_args_list)
+        html = lambda m: m.get_body(preferencelist=("html",)).get_content()
+        self.assertIn("Submit for me", html(owner_msg))
+        self.assertNotIn("Submit for me", html(shared_msg))
+        self.assertEqual(shared_msg["To"], "a@example.invalid")
+        self.assertTrue(any(p.get_filename().startswith("job_report") for p in shared_msg.iter_attachments()))
+
     def test_missing_credentials_disables_publishing(self):
         with patch.dict(os.environ, {}, clear=True), patch("job_agent.status.requests.post") as post:
             StatusPublisher().publish("role-scout", "running")

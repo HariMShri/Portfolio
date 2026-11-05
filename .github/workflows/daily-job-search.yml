@@ -86,8 +86,9 @@ jobs:
 
       - name: Run job search agent
         env:
-          # Brevo transactional email API for the digest email.
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY || secrets.SMTP_KEY }}
+          # Brevo for the digest email: SMTP relay (login in config.json), API key as fallback.
+          SMTP_KEY: ${{ secrets.SMTP_KEY }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           # Neon: shortlist, outcomes and memories shared with apply.py on your PC.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           STATUS_API_URL: ${{ vars.STATUS_API_URL }}

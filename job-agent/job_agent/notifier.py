@@ -1,7 +1,8 @@
-"""Sends the daily digest email through Brevo's transactional email API
-(https://developers.brevo.com/reference/sendtransacemail). Needs
-``BREVO_API_KEY`` (an ``xkeysib-...`` key from app.brevo.com -> SMTP & API ->
-API Keys) as an env var.
+"""Sends the daily digest email through Brevo (app.brevo.com -> SMTP & API).
+
+Preferred: the SMTP relay, with ``SMTP_KEY`` (env, secret) and the SMTP login
+(``notify.smtp_login`` in config, or ``SMTP_LOGIN`` env). Fallback: the
+transactional REST API with ``BREVO_API_KEY`` (an ``xkeysib-...`` key).
 
 ``notify.from_email`` must be a sender verified in Brevo. ``notify.to_email``
 is you and gets the approval buttons; ``notify.share_with`` (a list) gets the
@@ -93,15 +94,13 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
         print("  [notifier] no matches and always_send is false -- skipping email")
         return False
 
+    # SMTP (SMTP_KEY + login) is preferred; the REST API key is the fallback.
+    smtp_key = os.environ.get("SMTP_KEY")
+    smtp_login = os.environ.get("SMTP_LOGIN") or notify_cfg.get("smtp_login")
     api_key = os.environ.get("BREVO_API_KEY")
-    if not api_key:
-        print("  [notifier] BREVO_API_KEY not set -- skipping email send")
-        return False
-
-    try:
-        import requests
-    except ImportError:
-        print("  [notifier] requests not installed -- skipping email send")
+    use_smtp = bool(smtp_key and smtp_login)
+    if not use_smtp and not api_key:
+        print("  [notifier] neither SMTP_KEY (+ notify.smtp_login) nor BREVO_API_KEY is set -- skipping email send")
         return False
 
     # to_email is you: the only recipient who gets the approval buttons.
@@ -152,6 +151,29 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
 
     # One email for you (with approvals), then one per shared recipient (without).
     sends = ([(owner, True)] if owner else []) + [([addr], False) for addr in shared]
+    if use_smtp:
+        delivered = _send_smtp(sends, payload, smtp_login, smtp_key, notify_cfg)
+    else:
+        delivered = _send_api(sends, payload, api_key)
+
+    if not delivered:
+        return False
+    resumes = max(0, len(attachments) - (pdf_bytes is not None))
+    print(f"  [notifier] digest emailed to {', '.join(delivered)} with {resumes} tailored resume PDF(s)")
+    return True
+
+
+def _label(to: list[str], with_approvals: bool) -> list[str]:
+    return [a if with_approvals else f"{a} (no approvals)" for a in to]
+
+
+def _send_api(sends, payload, api_key: str) -> list[str]:
+    """Brevo transactional email REST API."""
+    try:
+        import requests
+    except ImportError:
+        print("  [notifier] requests not installed -- skipping email send")
+        return []
     delivered = []
     for to, with_approvals in sends:
         try:
@@ -167,13 +189,44 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
         if resp.status_code >= 300:
             print(f"  [notifier] Brevo API returned {resp.status_code} for {', '.join(to)}: {resp.text[:300]}")
             continue
-        delivered += [a if with_approvals else f"{a} (no approvals)" for a in to]
+        delivered += _label(to, with_approvals)
+    return delivered
 
-    if not delivered:
-        return False
-    resumes = max(0, len(attachments) - (pdf_bytes is not None))
-    print(f"  [notifier] digest emailed to {', '.join(delivered)} with {resumes} tailored resume PDF(s)")
-    return True
+
+def _send_smtp(sends, payload, login: str, key: str, notify_cfg: dict) -> list[str]:
+    """Brevo SMTP relay; builds the same message as the API payload."""
+    import base64
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formataddr
+
+    host = notify_cfg.get("smtp_host", "smtp-relay.brevo.com")
+    port = int(notify_cfg.get("smtp_port", 587))
+    delivered = []
+    try:
+        with smtplib.SMTP(host, port, timeout=30) as server:
+            server.starttls()
+            server.login(login, key)
+            for to, with_approvals in sends:
+                body = payload(to, with_approvals)
+                msg = EmailMessage()
+                msg["Subject"] = body["subject"]
+                msg["From"] = formataddr((body["sender"]["name"], body["sender"]["email"]))
+                msg["To"] = ", ".join(to)
+                msg.set_content("Your daily job search digest. Open this email in an HTML-capable client to see it.")
+                msg.add_alternative(body["htmlContent"], subtype="html")
+                for item in body.get("attachment", []):
+                    msg.add_attachment(base64.b64decode(item["content"]), maintype="application",
+                                       subtype="pdf", filename=item["name"])
+                try:
+                    server.send_message(msg, from_addr=body["sender"]["email"], to_addrs=to)
+                except smtplib.SMTPException as e:
+                    print(f"  [notifier] SMTP send to {', '.join(to)} failed: {type(e).__name__}: {e}")
+                    continue
+                delivered += _label(to, with_approvals)
+    except (smtplib.SMTPException, OSError) as e:
+        print(f"  [notifier] SMTP connection/login failed: {type(e).__name__}: {e}")
+    return delivered
 
 
 def _b64_bytes(data: bytes) -> str:
