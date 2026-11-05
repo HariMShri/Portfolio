@@ -152,7 +152,7 @@ document.getElementById('year').textContent = new Date().getFullYear();
         liveEl.classList.remove('is-live');
         liveEl.classList.add('is-unavailable');
         statusEl.textContent = 'Search finished · no drafts generated';
-        updatedEl.textContent = `Found ${data.counts.shortlisted} shortlisted roles, but no cover-note drafts or tailored resumes were reported. Check the latest Daily Job Search Digest logs -- the local model server may not have started. Email delivery separately requires RESEND_API_KEY. Job details remain private; this panel shows aggregate counts only.`;
+        updatedEl.textContent = `Found ${data.counts.shortlisted} shortlisted roles, but no cover-note drafts or tailored resumes were reported. Check the latest Daily Job Search Digest logs -- the local model server may not have started. Email delivery separately requires BREVO_API_KEY. Job details remain private; this panel shows aggregate counts only.`;
         const failedStages = new Set(['resume-tailor', 'application-writer', 'application-reviewer']);
         agentEls.forEach(({ card, label }, id) => {
           if (!failedStages.has(id)) return;

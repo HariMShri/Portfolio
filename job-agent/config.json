@@ -88,13 +88,11 @@
     "note": "Public unauthenticated search only. No login."
   },
   "notify": {
-  "enabled": true,
-  "to_email": [
-    "m.shrihari04@gmail.com",
-    "krithika47437@gmail.com",
-  ],
-  "from_email": "Job Search Agent <onboarding@resend.dev>",
-  "always_send": true
+    "enabled": true,
+    "to_email": "m.shrihari04@gmail.com",
+    "share_with": ["pavisteler2001@gmail.com", "krithika47437@gmail.com"],
+    "from_email": "Job Search Agent <m.shrihari04@gmail.com>",
+    "always_send": true
   },
   "local_model": "llama3.2:3b"
 }

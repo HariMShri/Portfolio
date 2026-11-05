@@ -37,18 +37,19 @@ which can hurt more than help. So this agent:
 
 ## Running it automatically (GitHub Actions)
 
-The scheduled workflow needs one repo secret. Go to
-**github.com/HariMShri/Portfolio → Settings → Secrets and variables →
-Actions → New repository secret** (never paste API keys into a chat or
-commit them to the repo):
+The digest email goes out through Brevo's transactional email API
+(app.brevo.com, free tier: 300 emails/day). In **github.com/HariMShri/Portfolio
+→ Settings → Secrets and variables → Actions** (never commit keys to the
+repo), add the secret `BREVO_API_KEY` — Brevo → SMTP & API → API Keys
+(starts with `xkeysib-`).
 
-- `RESEND_API_KEY` — from resend.com (free tier is plenty for one email/day).
-  Sign up, verify your account, create an API key. No domain verification
-  needed — this uses Resend's shared `onboarding@resend.dev` sending address
-  by default (see `config.json` → `notify.from_email` if you later verify
-  your own domain and want a nicer from-address).
+`config.json` → `notify.from_email` must be a sender verified in Brevo
+(Senders, domains & dedicated IPs → Senders). `notify.to_email` is you —
+the only one who gets the Submit / Fill / Skip approval buttons. Add anyone
+else to `notify.share_with`: they get the job list and PDFs, but no buttons,
+one email each, so they can't see each other's addresses.
 
-Once that secret is set, the workflow runs on its own daily (03:00 UTC /
+Once those are set, the workflow runs on its own daily (03:00 UTC /
 08:30 IST — GitHub schedule triggers aren't exact-to-the-minute). To test it
 immediately instead of waiting: **Actions tab → Daily Job Search Digest → Run
 workflow**.
@@ -97,8 +98,7 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Copy `.env.example` to `.env` and add your own `RESEND_API_KEY`
-(resend.com). For cover notes locally, install Ollama and run
+Copy `.env.example` to `.env` and add your own `BREVO_API_KEY`. For cover notes locally, install Ollama and run
 `ollama pull llama3.2:3b`; without it the run still produces the shortlist
 and tailored resumes. Never commit
 `.env` — it's already in `.gitignore`. Keep the tracked `.env.example` as

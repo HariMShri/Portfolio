@@ -1,11 +1,17 @@
-"""Sends the daily digest email via Resend (https://resend.com). Uses their
-shared `onboarding@resend.dev` sending address by default, which works
-without verifying your own domain -- fine for a personal reminder email to
-yourself. Requires RESEND_API_KEY as an env var; if it's not set, this just
-skips sending and logs why, same graceful-degradation pattern as the sources.
+"""Sends the daily digest email through Brevo's transactional email API
+(https://developers.brevo.com/reference/sendtransacemail). Needs
+``BREVO_API_KEY`` (an ``xkeysib-...`` key from app.brevo.com -> SMTP & API ->
+API Keys) as an env var.
+
+``notify.from_email`` must be a sender verified in Brevo. ``notify.to_email``
+is you and gets the approval buttons; ``notify.share_with`` (a list) gets the
+same job list and PDFs without them, one email each so nobody sees the other
+recipients. If the key is missing this just skips sending and logs why, same
+graceful-degradation pattern as the sources.
 """
 import glob
 import os
+from email.utils import parseaddr
 from datetime import datetime
 from .models import Job
 
@@ -87,9 +93,9 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
         print("  [notifier] no matches and always_send is false -- skipping email")
         return False
 
-    api_key = os.environ.get("RESEND_API_KEY")
+    api_key = os.environ.get("BREVO_API_KEY")
     if not api_key:
-        print("  [notifier] RESEND_API_KEY not set -- skipping email send")
+        print("  [notifier] BREVO_API_KEY not set -- skipping email send")
         return False
 
     try:
@@ -98,17 +104,21 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
         print("  [notifier] requests not installed -- skipping email send")
         return False
 
+    # to_email is you: the only recipient who gets the approval buttons.
+    # share_with get the same job list and PDFs, but no way to approve.
+    owner = _addresses(notify_cfg.get("to_email"))
+    shared = [a for a in _addresses(notify_cfg.get("share_with")) if a.lower() not in {o.lower() for o in owner}]
+    if not owner and not shared:
+        print("  [notifier] notify.to_email and notify.share_with are empty -- skipping email send")
+        return False
+
+    from_name, from_addr = parseaddr(notify_cfg.get("from_email", ""))
+    if not from_addr:
+        print("  [notifier] notify.from_email is not set -- skipping email send")
+        return False
+
     date_str = datetime.now().strftime("%Y-%m-%d")
     subject = f"Job search digest: {len(jobs)} match(es) -- {date_str}" if jobs else f"Job search digest: no matches today -- {date_str}"
-
-    body_html = f"""
-    <html><body style="font-family: sans-serif; max-width: 640px; margin: 0 auto;">
-    <h2>Daily Job Search Digest</h2>
-    <p style="color:#666; font-size:0.85em">{date_str}</p>
-    {_summary_html(jobs, profile)}
-    {_approvals_html(jobs, approval_links)}
-    </body></html>
-    """
 
     try:
         with open(pdf_path, "rb") as f:
@@ -117,40 +127,67 @@ def send_digest(jobs: list[Job], profile: dict, config: dict, pdf_path: str, app
         print(f"  [notifier] couldn't read PDF report at {pdf_path}, sending without attachment: {e}")
         pdf_bytes = None
 
-    payload = {
-        "from": notify_cfg.get("from_email", "Job Search Agent <onboarding@resend.dev>"),
-        "to": [notify_cfg.get("to_email")],
-        "subject": subject,
-        "html": body_html,
-    }
     attachments = []
     if pdf_bytes is not None:
-        attachments.append({"filename": f"job_report_{date_str}.pdf", "content": _b64_bytes(pdf_bytes)})
+        attachments.append({"name": f"job_report_{date_str}.pdf", "content": _b64_bytes(pdf_bytes)})
     attachments += _resume_attachments(pdf_path, profile)
-    if attachments:
-        payload["attachments"] = attachments
 
-    try:
-        resp = requests.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=20,
-        )
+    def payload(to: list[str], with_approvals: bool) -> dict:
+        body = {
+            "sender": {"name": from_name or "Job Search Agent", "email": from_addr},
+            "to": [{"email": addr} for addr in to],
+            "subject": subject,
+            "htmlContent": f"""
+            <html><body style="font-family: sans-serif; max-width: 640px; margin: 0 auto;">
+            <h2>Daily Job Search Digest</h2>
+            <p style="color:#666; font-size:0.85em">{date_str}</p>
+            {_summary_html(jobs, profile)}
+            {_approvals_html(jobs, approval_links) if with_approvals else ""}
+            </body></html>
+            """,
+        }
+        if attachments:
+            body["attachment"] = attachments
+        return body
+
+    # One email for you (with approvals), then one per shared recipient (without).
+    sends = ([(owner, True)] if owner else []) + [([addr], False) for addr in shared]
+    delivered = []
+    for to, with_approvals in sends:
+        try:
+            resp = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": api_key, "accept": "application/json", "content-type": "application/json"},
+                json=payload(to, with_approvals),
+                timeout=30,
+            )
+        except requests.RequestException as e:
+            print(f"  [notifier] send to {', '.join(to)} failed: {type(e).__name__}")
+            continue
         if resp.status_code >= 300:
-            print(f"  [notifier] Resend API returned {resp.status_code}: {resp.text[:300]}")
-            return False
-        resumes = max(0, len(attachments) - (pdf_bytes is not None))
-        print(f"  [notifier] digest emailed to {notify_cfg.get('to_email')} with {resumes} tailored resume PDF(s)")
-        return True
-    except requests.RequestException as e:
-        print(f"  [notifier] send failed: {e}")
+            print(f"  [notifier] Brevo API returned {resp.status_code} for {', '.join(to)}: {resp.text[:300]}")
+            continue
+        delivered += [a if with_approvals else f"{a} (no approvals)" for a in to]
+
+    if not delivered:
         return False
+    resumes = max(0, len(attachments) - (pdf_bytes is not None))
+    print(f"  [notifier] digest emailed to {', '.join(delivered)} with {resumes} tailored resume PDF(s)")
+    return True
 
 
 def _b64_bytes(data: bytes) -> str:
     import base64
     return base64.b64encode(data).decode("ascii")
+
+
+def _addresses(value) -> list[str]:
+    """One address, a comma-separated string, or a list -> clean list."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = value.split(",")
+    return [addr.strip() for addr in value if addr and addr.strip()]
 
 
 def _resume_attachments(pdf_path: str, profile: dict) -> list[dict]:
@@ -175,5 +212,5 @@ def _resume_attachments(pdf_path: str, profile: dict) -> list[dict]:
         except OSError as e:
             print(f"  [notifier] couldn't read a resume PDF, skipping it: {type(e).__name__}")
             continue
-        attachments.append({"filename": f"Resume_{owner}_{role_part}.pdf", "content": _b64_bytes(data)})
+        attachments.append({"name": f"Resume_{owner}_{role_part}.pdf", "content": _b64_bytes(data)})
     return attachments

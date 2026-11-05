@@ -13,7 +13,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # python-dotenv not installed -- RESEND_API_KEY must be set some other way
+    pass  # python-dotenv not installed -- BREVO_API_KEY must be set some other way
 
 from job_agent.models import Job
 from job_agent.matcher import score_and_filter
@@ -370,7 +370,7 @@ def main():
     notifications_enabled = config.get("notify", {}).get("enabled", False)
     if notifications_enabled and not digest_sent:
         print(
-            "\nDaily digest was not delivered. Check RESEND_API_KEY and the notifier "
+            "\nDaily digest was not delivered. Check BREVO_API_KEY and the notifier "
             "diagnostics above; the private report was written to the run output."
         )
         status.publish(

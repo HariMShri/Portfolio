@@ -222,13 +222,42 @@ class ResumePlanValidationTests(unittest.TestCase):
             resume_pdfs = list(Path(output_dir).glob("resume_*.pdf"))
             self.assertEqual(len(resume_pdfs), 1)
             self.assertTrue(resume_pdfs[0].read_bytes().startswith(b"%PDF"))
-            with patch.dict(os.environ, {"RESEND_API_KEY": "test-key"}),                     patch("requests.post") as post:
-                post.return_value.status_code = 200
+            config["notify"]["from_email"] = "Agent <sender@example.invalid>"
+            with patch.dict(os.environ, {"BREVO_API_KEY": "test-key"}), patch("requests.post") as post:
+                post.return_value.status_code = 201
                 self.assertTrue(send_digest([job], profile, config, pdf_path))
 
-        names = [item["filename"] for item in post.call_args.kwargs["json"]["attachments"]]
+        self.assertEqual(post.call_args.kwargs["headers"]["api-key"], "test-key")
+        names = [item["name"] for item in post.call_args.kwargs["json"]["attachment"]]
         self.assertEqual(names[0].split("_")[:2], ["job", "report"])
         self.assertEqual(names[1:], ["Resume_CandidateName_Example-Co_QA-Engineer.pdf"])
+
+    def test_shared_recipients_get_pdfs_but_no_approval_buttons(self):
+        from job_agent.notifier import send_digest
+
+        profile = {"name": "Candidate Name", "email": "candidate@example.invalid", "summary": "s",
+                   "experience": [], "education": [], "certifications": []}
+        job = Job("QA Engineer", "Example Co", "Remote", "https://example.invalid", "manual")
+        config = {"notify": {"enabled": True, "to_email": "owner@example.invalid",
+                             "share_with": ["a@example.invalid", "b@example.invalid"],
+                             "from_email": "Agent <sender@example.invalid>"}}
+        links = {job.job_id: {"submit": "https://example.invalid/s", "fill": "https://example.invalid/f",
+                              "skip": "https://example.invalid/k"}}
+
+        with TemporaryDirectory() as output_dir:
+            _, pdf_path, _ = write_report([job], profile, output_dir)
+            with patch.dict(os.environ, {"BREVO_API_KEY": "k"}), patch("requests.post") as post:
+                post.return_value.status_code = 201
+                self.assertTrue(send_digest([job], profile, config, pdf_path, approval_links=links))
+
+        bodies = [c.kwargs["json"] for c in post.call_args_list]
+        self.assertEqual([b["to"] for b in bodies], [[{"email": "owner@example.invalid"}],
+                                                     [{"email": "a@example.invalid"}], [{"email": "b@example.invalid"}]])
+        self.assertIn("Submit for me", bodies[0]["htmlContent"])
+        for shared in bodies[1:]:
+            self.assertNotIn("Submit for me", shared["htmlContent"])
+            self.assertNotIn("example.invalid/s", shared["htmlContent"])
+            self.assertTrue(any(a["name"].startswith("job_report") for a in shared["attachment"]))
 
     def test_missing_credentials_disables_publishing(self):
         with patch.dict(os.environ, {}, clear=True), patch("job_agent.status.requests.post") as post:
